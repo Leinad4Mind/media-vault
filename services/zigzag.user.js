@@ -695,6 +695,7 @@
         let items = getStored(STORE_CATALOG);
         let selIds = getStored(STORE_SELECTED);
         let locIds = getStored(STORE_LOCAL);
+        let currentFilter = 'all'; // 'all', 'local', 'missing'
 
         const isSelected = (id) => selIds.includes(id);
         const isLocal = (id) => locIds.includes(id);
@@ -705,6 +706,10 @@
             const localRoot = rootProgs.filter(i => locIds.includes(i.id)).length;
             const localEps = epsOnly.filter(i => locIds.includes(i.id)).length;
 
+            let filteredItems = items;
+            if (currentFilter === 'local') filteredItems = items.filter(i => isLocal(i.id));
+            if (currentFilter === 'missing') filteredItems = items.filter(i => !isLocal(i.id));
+
             const makeGlassCard = async (item) => {
                 const displayImg = await getCachedImageURL(item.poster) || item.poster;
                 const local = isLocal(item.id);
@@ -714,7 +719,7 @@
                 if (local) badges += `<div style="background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;backdrop-filter:blur(5px);box-shadow: 0 4px 10px rgba(0,0,0,0.5);">COLEÇÃO</div>`;
                 if (isSelected(item.id)) badges += `<div style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;backdrop-filter:blur(5px);box-shadow: 0 4px 10px rgba(0,0,0,0.5);">SELECIONADO</div>`;
 
-                let actionBtn = local ? `<button class="zz-remove-item" data-id="${item.id}" title="Remover da coleção local" style="background:rgba(239, 68, 68, 0.9);color:white;border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0.8;transition:0.3s;">✖</button>` : '';
+                let actionBtn = local ? `<button class="zz-remove-item" data-id="${item.id}" title="Remover da coleção local" style="background:rgba(239, 68, 68, 0.9);color:white;border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0.8;transition:0.3s;font-size:12px;">✖</button>` : `<button class="zz-add-item" data-id="${item.id}" title="Adicionar à coleção" style="background:rgba(59, 130, 246, 0.9);color:white;border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0.8;transition:0.3s;">+</button>`;
 
                 return `
                 <div class="zz-dash-card" style="background:rgba(20,25,35,0.6);border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,0.05);transition:transform 0.3s, box-shadow 0.3s;box-shadow:0 8px 30px rgba(0,0,0,0.4);position:relative;display:flex;flex-direction:column;">
@@ -736,7 +741,9 @@
                 </div>`;
             };
 
-            const cardsHtml = await Promise.all(items.map(makeGlassCard));
+            const cardsHtml = await Promise.all(filteredItems.map(makeGlassCard));
+
+            const btnStyleStyle = (active) => active ? "background:rgba(255,255,255,0.1);color:white;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:bold;transition:0.2s;" : "background:transparent;color:#94a3b8;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:bold;transition:0.2s;";
 
             overlay.innerHTML = `
                 <div style="max-width:1400px;margin:0 auto;padding-top:20px;">
@@ -751,6 +758,12 @@
                         </div>
                         
                         <div style="display:flex;gap:30px;align-items:center;">
+                            <!-- FILTROS -->
+                            <div style="display:flex;background:rgba(0,0,0,0.5);border-radius:10px;padding:4px;box-shadow:inset 0 2px 5px rgba(0,0,0,0.5);">
+                                <button class="zz-filter-btn" data-filter="all" style="${btnStyleStyle(currentFilter === 'all')}">Todos</button>
+                                <button class="zz-filter-btn" data-filter="local" style="${btnStyleStyle(currentFilter === 'local')}">Temos</button>
+                                <button class="zz-filter-btn" data-filter="missing" style="${btnStyleStyle(currentFilter === 'missing')}">Faltam</button>
+                            </div>
                             <!-- ESTATÍSTICAS -->
                             <div style="display:flex;gap:20px;text-align:center;">
                                 <div>
@@ -774,6 +787,8 @@
                         .zz-dash-card:hover img { transform: scale(1.05); }
                         .zz-dash-card a:hover { color: #818cf8 !important; }
                         .zz-remove-item:hover { background: #ef4444 !important; transform:scale(1.1); }
+                        .zz-add-item:hover { background: #2563eb !important; transform:scale(1.1); }
+                        .zz-filter-btn:hover { color:white !important; }
                         #zz-dash-close:hover { background:rgba(239, 68, 68, 0.8) !important; border-color:rgba(239, 68, 68, 1) !important; }
                     </style>
 
@@ -786,12 +801,16 @@
 
             overlay.querySelector('#zz-dash-close').onclick = () => overlay.remove();
             
-            // Add Remove Logic
+            overlay.querySelectorAll('.zz-filter-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    currentFilter = e.target.getAttribute('data-filter');
+                    render();
+                };
+            });
+            
             overlay.querySelectorAll('.zz-remove-item').forEach(btn => {
                 btn.onclick = async (e) => {
                     const id = e.target.getAttribute('data-id');
-                    
-                    // Remover a si próprio e aos filhos (se for programa) da STORE_LOCAL
                     let currentLocal = getStored(STORE_LOCAL);
                     const dependents = new Set();
                     items.filter(child => child.parentId === id).forEach(child => {
@@ -803,10 +822,34 @@
                     currentLocal = currentLocal.filter(i => i !== id && !depArray.includes(i));
                     
                     setStored(STORE_LOCAL, currentLocal);
-                    locIds = currentLocal; // atualiza estado interno p re-render
-                    
+                    locIds = currentLocal; 
                     saveToCloud(); highlightCards(); updateStats();
-                    render(); // Re-render imediato
+                    render(); 
+                }
+            });
+
+            overlay.querySelectorAll('.zz-add-item').forEach(btn => {
+                btn.onclick = async (e) => {
+                    const id = e.target.getAttribute('data-id');
+                    let currentLocal = getStored(STORE_LOCAL);
+                    
+                    // Adicionar à lista e forçar spider se não sabermos parentesco profundo?
+                    // Como estamos na dashboard, apenas marcamos a si e filhos dependentes.
+                    if (!currentLocal.includes(id)) currentLocal.push(id);
+
+                    const dependents = new Set();
+                    items.filter(child => child.parentId === id).forEach(child => {
+                        dependents.add(child.id);
+                        items.filter(sub => sub.url.startsWith(child.url) && sub.id !== child.id).forEach(sub => dependents.add(sub.id));
+                    });
+                    
+                    const depArray = Array.from(dependents);
+                    depArray.forEach(d => { if (!currentLocal.includes(d)) currentLocal.push(d); });
+                    
+                    setStored(STORE_LOCAL, currentLocal);
+                    locIds = currentLocal;
+                    saveToCloud(); highlightCards(); updateStats();
+                    render();
                 }
             });
         };
