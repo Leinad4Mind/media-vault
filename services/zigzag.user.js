@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         RTP Play Zig Zag — Master Manager v1
+// @name         RTP Play Zig Zag — Master Manager v2
 // @namespace    leinad4mind.github.io
-// @version      1.0.0
-// @description  Versão Final: Dashboard, Gestão de API, Deep Scrape, Cloud Sync e correção de duplicados.
+// @version      2.0.0
+// @description  Dashboard, Gestão de API, Deep Scrape, Cloud Sync e muito mais.
 // @author       Leinad4Mind
 // @match        https://www.rtp.pt/play/zigzag/*
 // @grant        GM_getValue
@@ -193,11 +193,21 @@
 
             if (sameCount >= 4) {
                 clearInterval(interval);
-                setStored(STORE_CATALOG, Array.from(catalogMap.values()));
+                let currentCatalog = Array.from(catalogMap.values());
+
+                if (confirm(`Encontrados ${currentCatalog.length} programas na vista!\nDeseja realizar um varrimento profundo (Deep Scan) dentro de TODOS eles para descobrir o número total exato de episódios e partes?\n\nNota: Este processo decorre num túnel invisível mas pode demorar alguns minutos. Não feche o separador!`)) {
+                    const programsTargets = currentCatalog.filter(i => !i.url.includes('/e'));
+                    const res = await backgroundSpider(programsTargets, (msg) => {
+                        btn.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;">${ICONS.cloud}<span>${msg}</span></span>`;
+                    });
+                    currentCatalog = res.updatedCatalog;
+                }
+
+                setStored(STORE_CATALOG, currentCatalog);
                 await saveToCloud();
                 btn.disabled = false;
                 btn.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;">${ICONS.cloud}<span>Guardar catálogo + Nuvem</span></span>`;
-                toast("Catálogo atualizado e sincronizado!");
+                toast("Catálogo atualizado e sincronizado na Nuvem!");
                 highlightCards(); updateStats();
             }
         }, 1200);
@@ -269,7 +279,7 @@
                                     let cur = idoc.body.scrollHeight;
                                     if (cur === lastH) sameCount++; else { sameCount = 0; lastH = cur; }
 
-                                    if (sameCount >= 4) {
+                                    if (sameCount >= 6) {
                                         clearInterval(iv);
                                         let epMap = new Map();
                                         idoc.querySelectorAll('a').forEach(a => {
@@ -299,6 +309,11 @@
 
                     // Descobrir partes nos episódios
                     for (let j = 0; j < epLinks.length; j++) {
+                        const epBaseId = getZZID(epLinks[j].url);
+                        if (updatedCatalog.some(c => c.id === epBaseId && c.parentId)) {
+                            continue; // Episódio já foi totalmente mapeado no passado, poupar os servidores RTP!
+                        }
+
                         onProgress(`A extrair partes (Ep ${j + 1}/${epLinks.length})`);
                         try {
                             const epRes = await fetch(epLinks[j].url);
@@ -309,12 +324,18 @@
                             parts.forEach(p => {
                                 if (!allLinks.includes(p.url)) allLinks.push(p.url);
                                 const pId = getZZID(p.url);
-                                if (!updatedCatalog.find(c => c.id === pId)) {
+                                const existingIndex = updatedCatalog.findIndex(c => c.id === pId);
+
+                                if (existingIndex === -1) {
+                                    // Novo episódio
                                     updatedCatalog.push({
                                         id: pId, parentId: targets[i].id, url: p.url,
                                         title: epLinks[j].title + (parts.length > 1 ? ` (${p.name})` : ''),
                                         poster: epLinks[j].poster, saved_at: Date.now()
                                     });
+                                } else if (!updatedCatalog[existingIndex].parentId) {
+                                    // Curar episódio orfão existente injetando o parentId
+                                    updatedCatalog[existingIndex].parentId = targets[i].id;
                                 }
                             });
                         } catch (e) { }
@@ -456,7 +477,7 @@
                     setStored(STORE_SELECTED, s);
                     highlightCards(); updateStats(); renderButtons();
                 };
-                
+
                 // Se o card for a própria âncora, os botões têm de ficar com position: absolute num parente ou no inner
                 const targetAppender = card.querySelector('.img-holder') || card;
                 targetAppender.style.position = 'relative';
@@ -489,7 +510,7 @@
                         });
                         c.filter(p => p.url.startsWith(url) && p.id !== id).forEach(p => dependents.add(p.id));
                         const depArray = Array.from(dependents);
-                        
+
                         l = l.filter(i => i !== id && !depArray.includes(i));
                         setStored(STORE_LOCAL, l);
                         highlightCards(); updateStats(); saveToCloud();
@@ -497,17 +518,17 @@
                         // Marcar o Pai e TODA a linhagem. Corre Spider para garantir integridade.
                         bL.innerHTML = "⏳";
                         bL.style.pointerEvents = "none";
-                        
+
                         const target = [{ url, id, title: titleRaw, poster, parentId: isEpisode ? null : id }];
                         let closeToast = null;
                         const res = await backgroundSpider(target, (msg) => {
                             closeToast = updateToast("zz-spider-toast-" + id, msg);
                         });
                         if (closeToast) closeToast();
-                        
+
                         setStored(STORE_CATALOG, res.updatedCatalog);
                         c = res.updatedCatalog; // atualizar cache
-                        
+
                         const dependents = new Set();
                         c.filter(child => child.parentId === id).forEach(child => {
                             dependents.add(child.id);
@@ -518,15 +539,15 @@
 
                         if (!l.includes(id)) l.push(id);
                         depArray.forEach(d => { if (!l.includes(d)) l.push(d); });
-                        
+
                         setStored(STORE_LOCAL, l);
-                        
+
                         bL.innerHTML = ICONS.local;
                         bL.style.pointerEvents = "auto";
                         highlightCards(); updateStats(); saveToCloud();
                     }
                 };
-                
+
                 const targetAppenderLayer = card.querySelector('.img-holder') || card;
                 targetAppenderLayer.style.position = 'relative';
                 targetAppenderLayer.appendChild(bL);
@@ -719,7 +740,7 @@
        ===================================================================== */
     function highlightSinglePage() {
         const url = window.location.href.split('?')[0].split('#')[0];
-        
+
         // Apenas ativa se não for na homepage nem na listagem de programas
         if (url.endsWith('/programas') || url === 'https://www.rtp.pt/play/zigzag/') return;
 
@@ -728,79 +749,88 @@
 
         const id = getZZID(url);
         const l = getStored(STORE_LOCAL);
-        
+
         // Se URL tiver /e ou número de parte, é nativamente sub-item
         const isEpisodeOrPart = url.includes('/e') || url.match(/\/\d+$/);
         const isLocal = l.includes(id) || (!isEpisodeOrPart && checkProgramCompletion(id));
-        
+
         const btn = document.createElement('div');
         btn.className = 'zz-btn-local-single';
         btn.innerHTML = ICONS.local;
         btn.title = "Guardar Coleção / Marcar Local";
         btn.style.cssText = `display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;cursor:pointer;border:2px solid ${isLocal ? '#3b82f6' : 'rgba(255,255,255,0.2)'};background:${isLocal ? '#3b82f6' : 'rgba(0,0,0,0.6)'};color:white;margin-left:18px;vertical-align:middle;transition:0.3s;box-shadow:0 4px 10px rgba(0,0,0,0.3);`;
-        
-        btn.onmouseover = () => { if(btn.style.background !== 'rgb(59, 130, 246)') btn.style.background = 'rgba(59, 130, 246, 0.4)'; };
-        btn.onmouseout = () => { if(btn.style.background !== 'rgb(59, 130, 246)') btn.style.background = 'rgba(0,0,0,0.6)'; };
+
+        btn.onmouseover = () => { if (btn.style.background !== 'rgb(59, 130, 246)') btn.style.background = 'rgba(59, 130, 246, 0.4)'; };
+        btn.onmouseout = () => { if (btn.style.background !== 'rgb(59, 130, 246)') btn.style.background = 'rgba(0,0,0,0.6)'; };
 
         btn.onclick = async (e) => {
             e.preventDefault(); e.stopPropagation();
-            
-            // Fazer um clone do H1 para o título (evitar copiar também o conteúdo do botão!)
+
             const clonedH1 = h1.cloneNode(true);
             const existingBtn = clonedH1.querySelector('.zz-btn-local-single');
-            if(existingBtn) existingBtn.remove();
-            
+            if (existingBtn) existingBtn.remove();
+
             const titleRaw = clonedH1.textContent.trim();
             const poster = document.querySelector('meta[property="og:image"]')?.content || "";
 
-            addToCatalog(id, url, titleRaw, poster);
+            // Redirecionamento Magno: extraímos a URL mãe do Programa para invocar a aranha com toda a hierarquia!
+            let rootUrl = url;
+            let rootId = id;
+            if (isEpisodeOrPart) {
+                const u = new URL(url);
+                u.pathname = u.pathname.split('/').filter(p => !p.match(/^e\d+$/) && !p.match(/^\d+$/)).join('/');
+                rootUrl = u.href;
+                rootId = getZZID(rootUrl);
+            }
+
+            addToCatalog(rootId, rootUrl, titleRaw, poster);
             let localList = getStored(STORE_LOCAL);
             let catList = getStored(STORE_CATALOG);
-            
-            if (localList.includes(id)) {
+
+            if (localList.includes(rootId)) {
                 // Desmarcar
-                btn.style.background = "rgba(0,0,0,0.6)"; 
+                btn.style.background = "rgba(0,0,0,0.6)";
                 btn.style.borderColor = "rgba(255,255,255,0.2)";
-                
+
                 const dependents = new Set();
-                catList.filter(child => child.parentId === id).forEach(child => {
+                catList.filter(child => child.parentId === rootId).forEach(child => {
                     dependents.add(child.id);
                     catList.filter(sub => sub.url.startsWith(child.url) && sub.id !== child.id).forEach(sub => dependents.add(sub.id));
                 });
-                catList.filter(p => p.url.startsWith(url) && p.id !== id).forEach(p => dependents.add(p.id));
+                catList.filter(p => p.url.startsWith(rootUrl) && p.id !== rootId).forEach(p => dependents.add(p.id));
                 const depArray = Array.from(dependents);
-                
-                localList = localList.filter(i => i !== id && !depArray.includes(i));
+
+                localList = localList.filter(i => i !== rootId && !depArray.includes(i));
                 setStored(STORE_LOCAL, localList);
                 saveToCloud(); updateStats(); highlightCards();
             } else {
-                // Marcar ativo (e invocar spider se possuir herdeiros)
+                // Marcar ativo (Spider varre TODO O PROGRAMA partindo da raiz)
                 btn.innerHTML = "⏳";
                 btn.style.pointerEvents = "none";
-                
-                const target = [{ url, id, title: titleRaw, poster, parentId: isEpisodeOrPart ? null : id }];
+
+                const target = [{ url: rootUrl, id: rootId, title: titleRaw, poster, parentId: null }];
                 let closeToast = null;
                 const res = await backgroundSpider(target, (msg) => {
-                    closeToast = updateToast("zz-spider-toast-" + id, msg);
+                    closeToast = updateToast("zz-spider-toast-" + rootId, msg);
                 });
                 if (closeToast) closeToast();
-                
+
                 setStored(STORE_CATALOG, res.updatedCatalog);
                 catList = res.updatedCatalog;
-                
+
                 const dependents = new Set();
-                catList.filter(child => child.parentId === id).forEach(child => {
+                catList.filter(child => child.parentId === rootId).forEach(child => {
                     dependents.add(child.id);
                     catList.filter(sub => sub.url.startsWith(child.url) && sub.id !== child.id).forEach(sub => dependents.add(sub.id));
                 });
-                catList.filter(p => p.url.startsWith(url) && p.id !== id).forEach(p => dependents.add(p.id));
+                catList.filter(p => p.url.startsWith(rootUrl) && p.id !== rootId).forEach(p => dependents.add(p.id));
                 const depArray = Array.from(dependents);
 
-                if (!localList.includes(id)) localList.push(id);
+                if (!localList.includes(rootId)) localList.push(rootId);
                 depArray.forEach(d => { if (!localList.includes(d)) localList.push(d); });
-                
+
                 setStored(STORE_LOCAL, localList);
-                
+
                 btn.innerHTML = ICONS.local;
                 btn.style.background = "#3b82f6";
                 btn.style.borderColor = "#3b82f6";
