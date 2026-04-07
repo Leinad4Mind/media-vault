@@ -248,12 +248,16 @@
                     parts.forEach(p => {
                         if (!allLinks.includes(p.url)) allLinks.push(p.url);
                         const pId = getZZID(p.url);
-                        if (!updatedCatalog.find(c => c.id === pId)) {
+                        const existingIndex = updatedCatalog.findIndex(c => c.id === pId);
+                        
+                        if (existingIndex === -1) {
                             updatedCatalog.push({
                                 id: pId, parentId: targets[i].parentId || targets[i].id, url: p.url,
                                 title: targets[i].title + (parts.length > 1 ? ` (${p.name})` : ''),
                                 poster: targets[i].poster, saved_at: Date.now()
                             });
+                        } else if (!updatedCatalog[existingIndex].parentId) {
+                            updatedCatalog[existingIndex].parentId = targets[i].parentId || targets[i].id;
                         }
                     });
 
