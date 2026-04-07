@@ -203,37 +203,33 @@
         }, 1200);
     }
 
-    async function copyDeepScrapeLinks() {
-        const selectedIds = getStored(STORE_SELECTED);
-        const catalog = getStored(STORE_CATALOG);
-        const targets = catalog.filter(item => selectedIds.includes(item.id));
 
-        if (!targets.length) return alert("Selecione (✓) os programas ou episódios primeiro!");
 
-        const btn = document.getElementById('zz-copy-action');
-        const originalContent = btn.innerHTML;
-        btn.disabled = true;
+    const extractParts = (doc, baseUrl) => {
+        let activeEl = doc.querySelector('.section-parts ul.parts li.active span, .section-parts ul.parts li.active a');
+        let activeName = activeEl ? activeEl.textContent.trim() : "PARTE 1";
+        let links = [{ url: baseUrl, name: activeName }];
+        doc.querySelectorAll('.section-parts ul.parts li:not(.active) a').forEach(a => {
+            if (a.href) links.push({ url: new URL(a.href, location.origin).href, name: a.textContent.trim() });
+        });
+        return links;
+    };
 
+    /**
+     * @param {Array} targets - items to scrape [{ url, id, title, poster, parentId }]
+     * @param {Function} onProgress - callback(message)
+     */
+    async function backgroundSpider(targets, onProgress) {
+        let updatedCatalog = [...getStored(STORE_CATALOG)];
         let allLinks = [];
-        let updatedCatalog = [...catalog];
-
-        const extractParts = (doc, baseUrl) => {
-            let activeEl = doc.querySelector('.section-parts ul.parts li.active span, .section-parts ul.parts li.active a');
-            let activeName = activeEl ? activeEl.textContent.trim() : "PARTE 1";
-            let links = [{ url: baseUrl, name: activeName }];
-            doc.querySelectorAll('.section-parts ul.parts li:not(.active) a').forEach(a => {
-                if (a.href) links.push({ url: new URL(a.href, location.origin).href, name: a.textContent.trim() });
-            });
-            return links;
-        };
 
         for (let i = 0; i < targets.length; i++) {
-            btn.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;">${ICONS.copy}<span>Scraping ${i + 1}/${targets.length}...</span></span>`;
+            onProgress(`A processar ${i + 1}/${targets.length}...`);
             try {
                 const targetUrl = targets[i].url;
 
                 if (targetUrl.includes('/e')) {
-                    // É um episódio (selecionado nativamente)
+                    // É um episódio nativo
                     const res = await fetch(targetUrl);
                     const text = await res.text();
                     const doc = new DOMParser().parseFromString(text, "text/html");
@@ -252,12 +248,12 @@
                     });
 
                 } else {
-                    // É um programa (abrimos iframe para renderizar todos os ajax e infinite scroll)
-                    btn.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;">${ICONS.cloud}<span>A varrer listagem inteira (${i + 1}/${targets.length})...</span></span>`;
+                    // É um programa, usar iframe para carregar infinite scroll
+                    onProgress(`A indexar listagem inteira...`);
 
                     const epLinks = await new Promise(resolve => {
                         const iframe = document.createElement('iframe');
-                        iframe.style.cssText = "width:10px;height:10px;position:absolute;top:-9999px;opacity:0;";
+                        iframe.style.cssText = "width:1200px;height:800px;position:fixed;top:-10000px;left:-10000px;opacity:0.01;pointer-events:none;z-index:-1;";
                         document.body.appendChild(iframe);
 
                         iframe.onload = () => {
@@ -271,12 +267,7 @@
                                     if (btnMore) btnMore.click();
 
                                     let cur = idoc.body.scrollHeight;
-                                    if (cur === lastH) {
-                                        sameCount++;
-                                    } else {
-                                        sameCount = 0;
-                                        lastH = cur;
-                                    }
+                                    if (cur === lastH) sameCount++; else { sameCount = 0; lastH = cur; }
 
                                     if (sameCount >= 4) {
                                         clearInterval(iv);
@@ -290,7 +281,7 @@
                                                 let container = a.closest('article, div');
                                                 epMap.set(fullUrl, {
                                                     url: fullUrl,
-                                                    title: container?.querySelector('.program-name, h4')?.textContent.trim() || a.textContent.trim() || "Episódio",
+                                                    title: container?.querySelector('.program-name, h4')?.textContent.trim() || a.textContent.trim() || "Ep",
                                                     poster: container?.querySelector('img')?.src || ""
                                                 });
                                             }
@@ -306,9 +297,9 @@
                         iframe.src = targetUrl;
                     });
 
-                    // Para cada episódio escavado, vamos confirmar se tem partes
+                    // Descobrir partes nos episódios
                     for (let j = 0; j < epLinks.length; j++) {
-                        btn.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;">${ICONS.copy}<span>S ${i + 1}/${targets.length} (Ep ${j + 1}/${epLinks.length})</span></span>`;
+                        onProgress(`A extrair partes (Ep ${j + 1}/${epLinks.length})`);
                         try {
                             const epRes = await fetch(epLinks[j].url);
                             const epText = await epRes.text();
@@ -327,11 +318,29 @@
                                 }
                             });
                         } catch (e) { }
-                        await new Promise(r => setTimeout(r, 600)); // previne bloqueio de rate-limit
+                        await new Promise(r => setTimeout(r, 600)); // Delay p/ não engasgar rate limit da RTP
                     }
                 }
             } catch (e) { }
         }
+
+        return { allLinks, updatedCatalog };
+    }
+
+    async function copyDeepScrapeLinks() {
+        const selectedIds = getStored(STORE_SELECTED);
+        const catalog = getStored(STORE_CATALOG);
+        const targets = catalog.filter(item => selectedIds.includes(item.id));
+
+        if (!targets.length) return alert("Selecione (✓) os programas ou episódios primeiro!");
+
+        const btn = document.getElementById('zz-copy-action');
+        const originalContent = btn.innerHTML;
+        btn.disabled = true;
+
+        const { allLinks, updatedCatalog } = await backgroundSpider(targets, (msg) => {
+            btn.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;">${ICONS.copy}<span>${msg}</span></span>`;
+        });
 
         setStored(STORE_CATALOG, updatedCatalog);
         GM_setClipboard(allLinks.join('\n'), "text");
@@ -384,6 +393,25 @@
         t.style.cssText = `background:rgba(10,14,22,.97);color:#f1f5f9;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;border-left:4px solid ${ACCENT_COLOR};box-shadow:0 8px 24px rgba(0,0,0,.5);backdrop-filter:blur(8px);pointer-events:auto;font-family:system-ui;`;
         t.textContent = msg; c.appendChild(t);
         setTimeout(() => t.remove(), 4000);
+    }
+
+    function updateToast(id, msg) {
+        let c = document.getElementById("zz-toast-container");
+        if (!c) { c = document.createElement("div"); c.id = "zz-toast-container"; c.style.cssText = "position:fixed;bottom:20px;right:20px;z-index:1000001;display:flex;flex-direction:column;gap:8px;pointer-events:none;"; document.body.appendChild(c); }
+        let t = document.getElementById(id);
+        if (!t) {
+            t = document.createElement("div"); t.id = id;
+            t.style.cssText = `background:rgba(10,14,22,.97);color:#f1f5f9;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;border-left:4px solid #3b82f6;box-shadow:0 8px 24px rgba(0,0,0,.5);backdrop-filter:blur(8px);pointer-events:auto;font-family:system-ui;display:flex;align-items:center;gap:10px;`;
+            c.appendChild(t);
+        }
+        t.innerHTML = `<span style="display:inline-block;animation:spin 2s linear infinite;">⏳</span><span>${msg}</span>`;
+        // Injetar keyframes de spin se não existirem
+        if (!document.getElementById('zz-spin-style')) {
+            const style = document.createElement('style'); style.id = 'zz-spin-style';
+            style.textContent = `@keyframes spin { 100% { transform: rotate(360deg); } }`;
+            document.head.appendChild(style);
+        }
+        return () => t.remove();
     }
 
     /* =====================================================================
@@ -442,38 +470,61 @@
                 bL = document.createElement('div'); bL.className = 'zz-btn-local'; bL.innerHTML = ICONS.local;
                 bL.style.cssText = `position:absolute;top:10px;right:48px;z-index:100;width:30px;height:30px;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid white;`;
 
-                bL.onclick = (e) => {
+                bL.onclick = async (e) => {
                     e.preventDefault(); e.stopPropagation();
                     const titleRaw = card.querySelector('.program-name, h4')?.textContent.trim() || a.title?.replace(/Aceder a /i, '').trim() || "Item";
-                    addToCatalog(id, url, titleRaw, card.querySelector('img')?.src);
+                    const poster = card.querySelector('img')?.src;
+                    addToCatalog(id, url, titleRaw, poster);
                     let l = getStored(STORE_LOCAL);
-                    const c = getStored(STORE_CATALOG);
+                    let c = getStored(STORE_CATALOG);
 
-                    if (isEpisode) {
-                        // Detetar partes cujo URL derive deste episódio
-                        const partIds = c.filter(item => item.url.startsWith(url) && item.id !== id).map(item => item.id);
-                        if (l.includes(id)) {
-                            l = l.filter(i => i !== id && !partIds.includes(i));
-                        } else {
-                            l.push(id);
-                            partIds.forEach(pId => { if (!l.includes(pId)) l.push(pId); });
-                        }
+                    const isProgLocal = !isEpisode && checkProgramCompletion(id);
+
+                    if (isProgLocal || l.includes(id)) {
+                        // Desmarcar o Pai e TODA a linhagem
+                        const dependents = new Set();
+                        c.filter(child => child.parentId === id).forEach(child => {
+                            dependents.add(child.id);
+                            c.filter(sub => sub.url.startsWith(child.url) && sub.id !== child.id).forEach(sub => dependents.add(sub.id));
+                        });
+                        c.filter(p => p.url.startsWith(url) && p.id !== id).forEach(p => dependents.add(p.id));
+                        const depArray = Array.from(dependents);
+                        
+                        l = l.filter(i => i !== id && !depArray.includes(i));
+                        setStored(STORE_LOCAL, l);
+                        highlightCards(); updateStats(); saveToCloud();
                     } else {
-                        const isProgLocal = checkProgramCompletion(id);
-                        const epIds = c.filter(item => item.parentId === id).map(item => item.id);
+                        // Marcar o Pai e TODA a linhagem. Corre Spider para garantir integridade.
+                        bL.innerHTML = "⏳";
+                        bL.style.pointerEvents = "none";
+                        
+                        const target = [{ url, id, title: titleRaw, poster, parentId: isEpisode ? null : id }];
+                        let closeToast = null;
+                        const res = await backgroundSpider(target, (msg) => {
+                            closeToast = updateToast("zz-spider-toast-" + id, msg);
+                        });
+                        if (closeToast) closeToast();
+                        
+                        setStored(STORE_CATALOG, res.updatedCatalog);
+                        c = res.updatedCatalog; // atualizar cache
+                        
+                        const dependents = new Set();
+                        c.filter(child => child.parentId === id).forEach(child => {
+                            dependents.add(child.id);
+                            c.filter(sub => sub.url.startsWith(child.url) && sub.id !== child.id).forEach(sub => dependents.add(sub.id));
+                        });
+                        c.filter(p => p.url.startsWith(url) && p.id !== id).forEach(p => dependents.add(p.id));
+                        const depArray = Array.from(dependents);
 
-                        if (isProgLocal || l.includes(id)) {
-                            // Remover programa e todos os episódios/partes conhecidos
-                            l = l.filter(i => i !== id && !epIds.includes(i));
-                        } else {
-                            // Adicionar programa e todos os episódios/partes conhecidos
-                            if (!l.includes(id)) l.push(id);
-                            epIds.forEach(epId => { if (!l.includes(epId)) l.push(epId); });
-                        }
+                        if (!l.includes(id)) l.push(id);
+                        depArray.forEach(d => { if (!l.includes(d)) l.push(d); });
+                        
+                        setStored(STORE_LOCAL, l);
+                        
+                        bL.innerHTML = ICONS.local;
+                        bL.style.pointerEvents = "auto";
+                        highlightCards(); updateStats(); saveToCloud();
                     }
-
-                    setStored(STORE_LOCAL, l);
-                    highlightCards(); updateStats(); saveToCloud();
                 };
                 
                 const targetAppenderLayer = card.querySelector('.img-holder') || card;
@@ -664,13 +715,115 @@
     }
 
     /* =====================================================================
+       HIGHLIGHT DE SINGLE PAGES (Dentro de um vídeo/episódio)
+       ===================================================================== */
+    function highlightSinglePage() {
+        const url = window.location.href.split('?')[0].split('#')[0];
+        
+        // Apenas ativa se não for na homepage nem na listagem de programas
+        if (url.endsWith('/programas') || url === 'https://www.rtp.pt/play/zigzag/') return;
+
+        const h1 = document.querySelector('h1.title, header h1, .program-name, h1');
+        if (!h1 || document.querySelector('.zz-btn-local-single')) return;
+
+        const id = getZZID(url);
+        const l = getStored(STORE_LOCAL);
+        
+        // Se URL tiver /e ou número de parte, é nativamente sub-item
+        const isEpisodeOrPart = url.includes('/e') || url.match(/\/\d+$/);
+        const isLocal = l.includes(id) || (!isEpisodeOrPart && checkProgramCompletion(id));
+        
+        const btn = document.createElement('div');
+        btn.className = 'zz-btn-local-single';
+        btn.innerHTML = ICONS.local;
+        btn.title = "Guardar Coleção / Marcar Local";
+        btn.style.cssText = `display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;cursor:pointer;border:2px solid ${isLocal ? '#3b82f6' : 'rgba(255,255,255,0.2)'};background:${isLocal ? '#3b82f6' : 'rgba(0,0,0,0.6)'};color:white;margin-left:18px;vertical-align:middle;transition:0.3s;box-shadow:0 4px 10px rgba(0,0,0,0.3);`;
+        
+        btn.onmouseover = () => { if(btn.style.background !== 'rgb(59, 130, 246)') btn.style.background = 'rgba(59, 130, 246, 0.4)'; };
+        btn.onmouseout = () => { if(btn.style.background !== 'rgb(59, 130, 246)') btn.style.background = 'rgba(0,0,0,0.6)'; };
+
+        btn.onclick = async (e) => {
+            e.preventDefault(); e.stopPropagation();
+            
+            // Fazer um clone do H1 para o título (evitar copiar também o conteúdo do botão!)
+            const clonedH1 = h1.cloneNode(true);
+            const existingBtn = clonedH1.querySelector('.zz-btn-local-single');
+            if(existingBtn) existingBtn.remove();
+            
+            const titleRaw = clonedH1.textContent.trim();
+            const poster = document.querySelector('meta[property="og:image"]')?.content || "";
+
+            addToCatalog(id, url, titleRaw, poster);
+            let localList = getStored(STORE_LOCAL);
+            let catList = getStored(STORE_CATALOG);
+            
+            if (localList.includes(id)) {
+                // Desmarcar
+                btn.style.background = "rgba(0,0,0,0.6)"; 
+                btn.style.borderColor = "rgba(255,255,255,0.2)";
+                
+                const dependents = new Set();
+                catList.filter(child => child.parentId === id).forEach(child => {
+                    dependents.add(child.id);
+                    catList.filter(sub => sub.url.startsWith(child.url) && sub.id !== child.id).forEach(sub => dependents.add(sub.id));
+                });
+                catList.filter(p => p.url.startsWith(url) && p.id !== id).forEach(p => dependents.add(p.id));
+                const depArray = Array.from(dependents);
+                
+                localList = localList.filter(i => i !== id && !depArray.includes(i));
+                setStored(STORE_LOCAL, localList);
+                saveToCloud(); updateStats(); highlightCards();
+            } else {
+                // Marcar ativo (e invocar spider se possuir herdeiros)
+                btn.innerHTML = "⏳";
+                btn.style.pointerEvents = "none";
+                
+                const target = [{ url, id, title: titleRaw, poster, parentId: isEpisodeOrPart ? null : id }];
+                let closeToast = null;
+                const res = await backgroundSpider(target, (msg) => {
+                    closeToast = updateToast("zz-spider-toast-" + id, msg);
+                });
+                if (closeToast) closeToast();
+                
+                setStored(STORE_CATALOG, res.updatedCatalog);
+                catList = res.updatedCatalog;
+                
+                const dependents = new Set();
+                catList.filter(child => child.parentId === id).forEach(child => {
+                    dependents.add(child.id);
+                    catList.filter(sub => sub.url.startsWith(child.url) && sub.id !== child.id).forEach(sub => dependents.add(sub.id));
+                });
+                catList.filter(p => p.url.startsWith(url) && p.id !== id).forEach(p => dependents.add(p.id));
+                const depArray = Array.from(dependents);
+
+                if (!localList.includes(id)) localList.push(id);
+                depArray.forEach(d => { if (!localList.includes(d)) localList.push(d); });
+                
+                setStored(STORE_LOCAL, localList);
+                
+                btn.innerHTML = ICONS.local;
+                btn.style.background = "#3b82f6";
+                btn.style.borderColor = "#3b82f6";
+                btn.style.pointerEvents = "auto";
+                saveToCloud(); updateStats(); highlightCards();
+            }
+        };
+
+        // Injetar o botão local de forma segura ao lado do H1
+        h1.style.display = 'flex';
+        h1.style.alignItems = 'center';
+        h1.appendChild(btn);
+    }
+
+    /* =====================================================================
        INIT
        ===================================================================== */
     async function init() {
         await initDB();
         injectUI();
         highlightCards();
-        const obs = new MutationObserver(() => highlightCards());
+        highlightSinglePage();
+        const obs = new MutationObserver(() => { highlightCards(); highlightSinglePage(); });
         obs.observe(document.body, { childList: true, subtree: true });
     }
 
