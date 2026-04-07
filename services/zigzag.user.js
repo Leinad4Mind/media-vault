@@ -169,8 +169,8 @@
         const interval = setInterval(async () => {
             window.scrollTo(0, document.body.scrollHeight);
 
-            document.querySelectorAll('article').forEach(art => {
-                const a = art.querySelector('a');
+            document.querySelectorAll('article, a.item').forEach(art => {
+                const a = art.tagName === 'A' ? art : art.querySelector('a');
                 if (!a || !a.href.includes('/zigzag/')) return;
 
                 const url = new URL(a.href, location.origin).href;
@@ -178,7 +178,7 @@
                 if (!catalogMap.has(id)) {
                     catalogMap.set(id, {
                         id, parentId: url.includes('/e') ? null : id, url,
-                        title: art.querySelector('.program-name, h4')?.textContent.trim() || "Sem Título",
+                        title: art.querySelector('.program-name, h4')?.textContent.trim() || a.title?.replace(/Aceder a /i, '').trim() || "Sem Título",
                         date: art.querySelector('.episode-date')?.textContent.trim() || "",
                         poster: art.querySelector('img')?.src || "",
                         saved_at: Date.now()
@@ -239,8 +239,8 @@
                     const doc = new DOMParser().parseFromString(text, "text/html");
 
                     const parts = extractParts(doc, targetUrl);
-                    parts.forEach(p => { 
-                        if (!allLinks.includes(p.url)) allLinks.push(p.url); 
+                    parts.forEach(p => {
+                        if (!allLinks.includes(p.url)) allLinks.push(p.url);
                         const pId = getZZID(p.url);
                         if (!updatedCatalog.find(c => c.id === pId)) {
                             updatedCatalog.push({
@@ -315,8 +315,8 @@
                             const epDoc = new DOMParser().parseFromString(epText, "text/html");
 
                             const parts = extractParts(epDoc, epLinks[j].url);
-                            parts.forEach(p => { 
-                                if (!allLinks.includes(p.url)) allLinks.push(p.url); 
+                            parts.forEach(p => {
+                                if (!allLinks.includes(p.url)) allLinks.push(p.url);
                                 const pId = getZZID(p.url);
                                 if (!updatedCatalog.find(c => c.id === pId)) {
                                     updatedCatalog.push({
@@ -393,8 +393,8 @@
         const selected = new Set(getStored(STORE_SELECTED));
         const local = new Set(getStored(STORE_LOCAL));
 
-        document.querySelectorAll('article').forEach(card => {
-            const a = card.querySelector('a');
+        document.querySelectorAll('article, a.item').forEach(card => {
+            const a = card.tagName === 'A' ? card : card.querySelector('a');
             if (!a || !a.href.includes('/zigzag/')) return;
 
             const url = new URL(a.href, location.origin).href;
@@ -414,41 +414,74 @@
             if (window.getComputedStyle(card).position === 'static') card.style.position = 'relative';
 
             // Botão Seleção (Verde ✓)
-            let bS = card.querySelector(':scope > .zz-btn-sel');
+            let bS = card.querySelector('.zz-btn-sel');
             if (!bS) {
                 bS = document.createElement('div'); bS.className = 'zz-btn-sel'; bS.innerHTML = '✓';
                 bS.style.cssText = `position:absolute;top:10px;right:10px;z-index:100;width:30px;height:30px;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid white;font-weight:bold;`;
 
                 bS.onclick = (e) => {
                     e.preventDefault(); e.stopPropagation();
-                    addToCatalog(id, url, card.querySelector('.program-name, h4')?.textContent.trim(), card.querySelector('img')?.src);
+                    const titleRaw = card.querySelector('.program-name, h4')?.textContent.trim() || a.title?.replace(/Aceder a /i, '').trim() || "Item";
+                    addToCatalog(id, url, titleRaw, card.querySelector('img')?.src);
                     let s = getStored(STORE_SELECTED);
                     if (s.includes(id)) s = s.filter(i => i !== id); else s.push(id);
                     setStored(STORE_SELECTED, s);
                     highlightCards(); updateStats(); renderButtons();
                 };
-                card.appendChild(bS);
+                
+                // Se o card for a própria âncora, os botões têm de ficar com position: absolute num parente ou no inner
+                const targetAppender = card.querySelector('.img-holder') || card;
+                targetAppender.style.position = 'relative';
+                targetAppender.appendChild(bS);
             }
             bS.style.background = isSelected ? "#10b981" : "rgba(0,0,0,0.6)";
 
             // Botão Local (Azul 📥)
-            let bL = card.querySelector(':scope > .zz-btn-local');
+            let bL = card.querySelector('.zz-btn-local');
             if (!bL) {
                 bL = document.createElement('div'); bL.className = 'zz-btn-local'; bL.innerHTML = ICONS.local;
                 bL.style.cssText = `position:absolute;top:10px;right:48px;z-index:100;width:30px;height:30px;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid white;`;
 
                 bL.onclick = (e) => {
                     e.preventDefault(); e.stopPropagation();
-                    addToCatalog(id, url, card.querySelector('.program-name, h4')?.textContent.trim(), card.querySelector('img')?.src);
+                    const titleRaw = card.querySelector('.program-name, h4')?.textContent.trim() || a.title?.replace(/Aceder a /i, '').trim() || "Item";
+                    addToCatalog(id, url, titleRaw, card.querySelector('img')?.src);
                     let l = getStored(STORE_LOCAL);
-                    if (l.includes(id)) l = l.filter(i => i !== id); else l.push(id);
+                    const c = getStored(STORE_CATALOG);
+
+                    if (isEpisode) {
+                        // Detetar partes cujo URL derive deste episódio
+                        const partIds = c.filter(item => item.url.startsWith(url) && item.id !== id).map(item => item.id);
+                        if (l.includes(id)) {
+                            l = l.filter(i => i !== id && !partIds.includes(i));
+                        } else {
+                            l.push(id);
+                            partIds.forEach(pId => { if (!l.includes(pId)) l.push(pId); });
+                        }
+                    } else {
+                        const isProgLocal = checkProgramCompletion(id);
+                        const epIds = c.filter(item => item.parentId === id).map(item => item.id);
+
+                        if (isProgLocal || l.includes(id)) {
+                            // Remover programa e todos os episódios/partes conhecidos
+                            l = l.filter(i => i !== id && !epIds.includes(i));
+                        } else {
+                            // Adicionar programa e todos os episódios/partes conhecidos
+                            if (!l.includes(id)) l.push(id);
+                            epIds.forEach(epId => { if (!l.includes(epId)) l.push(epId); });
+                        }
+                    }
+
                     setStored(STORE_LOCAL, l);
                     highlightCards(); updateStats(); saveToCloud();
                 };
-                card.appendChild(bL);
+                
+                const targetAppenderLayer = card.querySelector('.img-holder') || card;
+                targetAppenderLayer.style.position = 'relative';
+                targetAppenderLayer.appendChild(bL);
             }
             bL.style.background = isLocal ? "#3b82f6" : "rgba(0,0,0,0.6)";
-            bL.style.display = isEpisode ? "flex" : "none";
+            bL.style.display = "flex";
         });
     }
 
