@@ -155,6 +155,56 @@
         if (success > 0) toast(`Sincronizado com ${success} Nuvem(s)`);
     }
 
+    async function fetchCloudData() {
+        const configs = getApiConfigs();
+        if (!configs.length) return;
+        let catArray = getStored(STORE_CATALOG);
+        let locArray = getStored(STORE_LOCAL);
+        let selArray = getStored(STORE_SELECTED);
+        let updated = false;
+
+        toast("A sincronizar dados da nuvem...");
+
+        for (const api of configs) {
+            try {
+                const hdrs = api.apiKey ? { "x-api-key": api.apiKey } : undefined;
+                const res = await fetch(`${api.url}?keys=${STORE_CATALOG},${STORE_LOCAL},${STORE_SELECTED}`, { headers: hdrs });
+                if (!res.ok) continue;
+                let data = null;
+                try { data = await res.json(); } catch(e) { continue; }
+                
+                if (data && typeof data === 'object' && !Array.isArray(data)) {
+                    if (data[STORE_LOCAL] && Array.isArray(data[STORE_LOCAL])) {
+                        data[STORE_LOCAL].forEach(id => { if (!locArray.includes(id)) { locArray.push(id); updated = true; } });
+                    }
+                    if (data[STORE_SELECTED] && Array.isArray(data[STORE_SELECTED])) {
+                        data[STORE_SELECTED].forEach(id => { if (!selArray.includes(id)) { selArray.push(id); updated = true; } });
+                    }
+                    if (data[STORE_CATALOG] && Array.isArray(data[STORE_CATALOG])) {
+                        data[STORE_CATALOG].forEach(cItem => {
+                            const extIdx = catArray.findIndex(x => x.id === cItem.id);
+                            if (extIdx === -1) { catArray.push(cItem); updated = true; }
+                            else if (cItem.saved_at && (!catArray[extIdx].saved_at || cItem.saved_at > catArray[extIdx].saved_at)) {
+                                catArray[extIdx] = cItem; updated = true;
+                            }
+                        });
+                    }
+                }
+            } catch (e) { console.error(`Falha a obter dados da nuvem ${api.name}:`, e); }
+        }
+
+        if (updated) {
+            setStored(STORE_CATALOG, catArray);
+            setStored(STORE_LOCAL, locArray);
+            setStored(STORE_SELECTED, selArray);
+            highlightCards();
+            updateStats();
+            toast("Sincronização concluída com sucesso!");
+        } else {
+            toast("Nuvem sincronizada (sem novos dados).");
+        }
+    }
+
     /* =====================================================================
        DEEP SCAN & DEEP COPY
        ===================================================================== */
@@ -768,6 +818,7 @@
                     GM_setValue(STORE_API_CONFIGS, __obf(JSON.stringify(configs)));
                     editIndex = -1;
                     renderList();
+                    fetchCloudData();
                 } else {
                     toast("Nome e Worker URL são obrigatórios.");
                 }
