@@ -2467,9 +2467,9 @@
                 const close = () => { delete window._filminDashUpdateItem; delete window._filminDashScrapeProgress; revokeAllObjectURLs(); mod.remove(); };
                 const isSaved = (item) => item.isLocalDownloaded || Object.keys(item.cloudDownloaded).length > 0;
                 const badgeIcons = (item, srcName) => {
-                    let icons = ICONS.cloud;
-                    if (item.cloudDownloaded[srcName]) icons += ICONS.download;
-                    else if (item.cloudHistory[srcName]) icons += ICONS.history;
+                    let icons = '☁️';
+                    if (item.cloudDownloaded[srcName]) icons += ' ⏬';
+                    else if (item.cloudHistory[srcName]) icons += ' 🔖';
                     return icons;
                 };
                 const cardStyle = (item) => {
