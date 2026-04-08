@@ -696,6 +696,7 @@
         let selIds = getStored(STORE_SELECTED);
         let locIds = getStored(STORE_LOCAL);
         let currentFilter = 'all'; // 'all', 'local', 'missing'
+        let currentParentContext = null; // null = visa root; string (id) = vista nested
 
         const isSelected = (id) => selIds.includes(id);
         const isLocal = (id) => locIds.includes(id);
@@ -706,37 +707,69 @@
             const localRoot = rootProgs.filter(i => locIds.includes(i.id)).length;
             const localEps = epsOnly.filter(i => locIds.includes(i.id)).length;
 
-            let filteredItems = items;
-            if (currentFilter === 'local') filteredItems = items.filter(i => isLocal(i.id));
-            if (currentFilter === 'missing') filteredItems = items.filter(i => !isLocal(i.id));
+            // Filtration logic based on Context
+            let contextItems = [];
+            let breadcrumbHtml = ``;
+
+            if (currentParentContext === null) {
+                contextItems = rootProgs;
+            } else {
+                contextItems = items.filter(i => i.parentId === currentParentContext && i.id !== currentParentContext);
+                const parentInfo = rootProgs.find(p => p.id === currentParentContext);
+                const parentTitle = parentInfo ? parentInfo.title : 'Série';
+                
+                breadcrumbHtml = `
+                <div style="margin-bottom:20px;display:flex;align-items:center;gap:15px;">
+                    <button id="zz-dash-back" style="background:rgba(255,255,255,0.05);color:white;border:1px solid rgba(255,255,255,0.1);padding:10px 20px;border-radius:10px;cursor:pointer;font-weight:700;transition:0.3s;display:flex;align-items:center;gap:8px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                        Voltar a Todos Programas
+                    </button>
+                    <span style="color:#94a3b8;font-size:18px;">/</span>
+                    <h2 style="margin:0;font-size:22px;color:#f8fafc;font-weight:800;">${parentTitle} <span style="color:#475569;font-size:16px;font-weight:600;">(${contextItems.length} episódios)</span></h2>
+                </div>`;
+            }
+
+            let filteredItems = contextItems;
+            if (currentFilter === 'local') filteredItems = contextItems.filter(i => isLocal(i.id));
+            if (currentFilter === 'missing') filteredItems = contextItems.filter(i => !isLocal(i.id));
 
             const makeGlassCard = async (item) => {
                 const displayImg = await getCachedImageURL(item.poster) || item.poster;
                 const local = isLocal(item.id);
                 const isProg = !item.url.includes('/e');
+                const epsInSeries = isProg ? epsOnly.filter(e => e.parentId === item.id).length : 0;
 
                 let badges = '';
                 if (local) badges += `<div style="background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;backdrop-filter:blur(5px);box-shadow: 0 4px 10px rgba(0,0,0,0.5);">COLEÇÃO</div>`;
                 if (isSelected(item.id)) badges += `<div style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;backdrop-filter:blur(5px);box-shadow: 0 4px 10px rgba(0,0,0,0.5);">SELECIONADO</div>`;
 
-                let actionBtn = local ? `<button class="zz-remove-item" data-id="${item.id}" title="Remover da coleção local" style="background:rgba(239, 68, 68, 0.9);color:white;border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0.8;transition:0.3s;font-size:12px;">✖</button>` : `<button class="zz-add-item" data-id="${item.id}" title="Adicionar à coleção" style="background:rgba(59, 130, 246, 0.9);color:white;border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0.8;transition:0.3s;">+</button>`;
+                let actionBtn = local ? `<button class="zz-remove-item" data-id="${item.id}" title="Remover da coleção local" style="background:rgba(239, 68, 68, 0.9);color:white;border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0.8;transition:0.3s;font-size:12px;z-index:2;">✖</button>` : `<button class="zz-add-item" data-id="${item.id}" title="Adicionar à coleção" style="background:rgba(59, 130, 246, 0.9);color:white;border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0.8;transition:0.3s;z-index:2;">+</button>`;
+
+                let exploreLayer = isProg ? `
+                    <div style="position:absolute; inset:0; z-index:1; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.4); opacity:0; transition:0.3s;" class="hover-explore-layer">
+                        <button class="zz-explore-btn" data-id="${item.id}" style="background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.2);color:white;padding:12px 24px;border-radius:30px;font-weight:800;cursor:pointer;transform:translateY(10px);transition:0.3s;box-shadow:0 10px 25px rgba(0,0,0,0.5);">EXPLORAR</button>
+                    </div>` : '';
 
                 return `
                 <div class="zz-dash-card" style="background:rgba(20,25,35,0.6);border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,0.05);transition:transform 0.3s, box-shadow 0.3s;box-shadow:0 8px 30px rgba(0,0,0,0.4);position:relative;display:flex;flex-direction:column;">
-                    <div style="position:relative; aspect-ratio: 16/9; background: #000; overflow:hidden;">
+                    <div style="position:relative; aspect-ratio: 16/9; background: #000; overflow:hidden;" class="card-hero-wrap">
                         <img src="${displayImg}" style="width:100%;height:100%;object-fit:cover;transition:0.5s;filter:${local ? 'brightness(1.1)' : 'brightness(0.6)'};">
-                        <div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(10,14,23,1) 0%, transparent 60%);"></div>
+                        <div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(10,14,23,1) 0%, transparent 60%); pointer-events:none;"></div>
                         <div style="position:absolute; top:12px; right:12px; display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
                             <div style="display:flex; gap:6px;">${badges}</div>
                             ${actionBtn}
                         </div>
+                        ${exploreLayer}
                     </div>
                     <div style="padding:18px; flex:1; display:flex; flex-direction:column; justify-content:space-between;background:rgba(20,25,35,0.8);backdrop-filter:blur(10px);">
                         <div>
                             <div style="font-size:15px;font-weight:800;margin-bottom:6px;line-height:1.2;color:#f8fafc;${local ? 'text-shadow:0 0 10px rgba(255,255,255,0.2);' : ''}">${item.title}</div>
-                            <div style="font-size:12px;color:#cbd5e1;font-weight:500;">${isProg ? 'Programa / Série' : 'Episódio'} • <span style="opacity:0.7;">${item.date || 'Zig Zag'}</span></div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div style="font-size:12px;color:#cbd5e1;font-weight:500;">${isProg ? 'Programa / Série' : 'Episódio'} • <span style="opacity:0.7;">${item.date || 'Zig Zag'}</span></div>
+                                ${isProg ? `<div style="font-size:10px;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:10px;color:#94a3b8;font-weight:bold;">${epsInSeries} Eps</div>` : ''}
+                            </div>
                         </div>
-                        <a href="${item.url}" target="_blank" style="display:inline-block;margin-top:15px;color:#38bdf8;text-decoration:none;font-size:12px;font-weight:800;letter-spacing:0.5px;transition:0.2s;">VER NA RTP ↗</a>
+                        <a href="${item.url}" target="_blank" style="display:inline-block;margin-top:15px;color:#38bdf8;text-decoration:none;font-size:12px;font-weight:800;letter-spacing:0.5px;transition:0.2s;width:max-content;">VER NA RTP ↗</a>
                     </div>
                 </div>`;
             };
@@ -781,6 +814,8 @@
                         </div>
                     </div>
 
+                    ${breadcrumbHtml}
+
                     <!-- CSS HOVERS -->
                     <style>
                         .zz-dash-card:hover { transform: translateY(-5px); box-shadow: 0 15px 40px rgba(56, 189, 248, 0.1) !important; border-color: rgba(56, 189, 248, 0.4) !important; }
@@ -790,16 +825,35 @@
                         .zz-add-item:hover { background: #2563eb !important; transform:scale(1.1); }
                         .zz-filter-btn:hover { color:white !important; }
                         #zz-dash-close:hover { background:rgba(239, 68, 68, 0.8) !important; border-color:rgba(239, 68, 68, 1) !important; }
+                        #zz-dash-back:hover { background:rgba(255,255,255,0.1) !important; }
+                        .card-hero-wrap:hover .hover-explore-layer { opacity:1 !important; pointer-events:auto; }
+                        .card-hero-wrap:hover .zz-explore-btn { transform:translateY(0) !important; }
+                        .zz-explore-btn:hover { background:rgba(56,189,248,0.8) !important; border-color:rgba(56,189,248,1) !important; color:white; }
                     </style>
 
                     <!-- GRID -->
                     <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:30px;padding-bottom:50px;">
-                        ${cardsHtml.join('')}
+                        ${cardsHtml.length > 0 ? cardsHtml.join('') : '<div style="grid-column:1/-1;text-align:center;padding:50px;color:#475569;font-weight:600;font-size:20px;">Nenhum item encontrado nesta pasta/filtro.</div>'}
                     </div>
                 </div>
             `;
 
             overlay.querySelector('#zz-dash-close').onclick = () => overlay.remove();
+            
+            const backBtn = overlay.querySelector('#zz-dash-back');
+            if (backBtn) {
+                backBtn.onclick = () => {
+                    currentParentContext = null;
+                    render();
+                };
+            }
+
+            overlay.querySelectorAll('.zz-explore-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    currentParentContext = e.target.getAttribute('data-id');
+                    render();
+                };
+            });
             
             overlay.querySelectorAll('.zz-filter-btn').forEach(btn => {
                 btn.onclick = (e) => {
@@ -833,8 +887,6 @@
                     const id = e.target.getAttribute('data-id');
                     let currentLocal = getStored(STORE_LOCAL);
                     
-                    // Adicionar à lista e forçar spider se não sabermos parentesco profundo?
-                    // Como estamos na dashboard, apenas marcamos a si e filhos dependentes.
                     if (!currentLocal.includes(id)) currentLocal.push(id);
 
                     const dependents = new Set();
