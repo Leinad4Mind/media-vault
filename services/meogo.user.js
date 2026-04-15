@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MEO Go — Gestor de Catálogo, Downloads & Sync Cloud
 // @namespace    leinad4mind.top/forum
-// @version      2.4.2
+// @version      2.4.4
 // @description  Conta e guarda filmes/séries do MEO Go, sincroniza com Cloudflare Workers (multi-API), gere downloads e copiados, e apresenta uma Dashboard com filtros, posters, notas e exportação. Modifica também os links do header para incluir ?watch_more=1 e adiciona item "Destaques".
 // @author       Leinad4Mind
 // @license      MIT
@@ -15,8 +15,7 @@
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
 // @require      https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js
-// @connect      cdn.jsdelivr.net
-// @connect      unpkg.com
+// @connect      *
 // ==/UserScript==
 
 /*
@@ -174,6 +173,18 @@
  *           • A estratégia principal de fallback agora usa GM_xmlhttpRequest
  *             para buscar o código e injeta-o como texto (`s.textContent = code`),
  *             o que é interpretado como inline script e ignorado pelo CSP!
+ * v2.4.3 (2026-04-15) — Fix CSP Network Request Blocks (Worker API)
+ *           • Ligações para `*.workers.dev` via `fetch()` bloqueadas pelo
+ *             connect-src do Content Security Policy nativo do MEO Go
+ *           • Todos os `fetch()` substituídos por `gmFetch()` (um wrapper polyfill
+ *             de `GM_xmlhttpRequest` que ignora as restrições CSP da página)
+ *
+ * v2.4.4 (2026-04-15) — Permissão @connect wildcard
+ *           • Ao migrar para GM_xmlhttpRequest, passamos a estar sujeitos às
+ *             permissões de segurança nativas do Tampermonkey
+ *           • Adicionado `// @connect *` na metadata para permitir que a firewall
+ *             interna do TM se ligue livremente a qualquer Cloud Worker (já
+ *             que é o utilizador a adicionar domínios customizados)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -200,6 +211,26 @@
     const SITE_ORIGIN = "https://meogo.meo.pt";
 
     const AUTO_UPDATE_MS = 650;
+
+    function gmFetch(url, options = {}) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: options.method || 'GET',
+                url: url,
+                headers: options.headers || {},
+                data: options.body,
+                onload: (res) => resolve({
+                    ok: res.status >= 200 && res.status < 300,
+                    status: res.status,
+                    text: async () => res.responseText,
+                    json: async () => JSON.parse(res.responseText)
+                }),
+                onerror: () => reject(new Error('Rede (GM_xmlhttpRequest)')),
+                ontimeout: () => reject(new Error('Timeout (GM_xmlhttpRequest)')),
+                timeout: 30000
+            });
+        });
+    }
 
     /* =====================================================================
        ESTADO GLOBAL
@@ -904,7 +935,7 @@
 
             try {
                 await sleep(baseDelay);
-                const res = await fetch(item.url);
+                const res = await gmFetch(item.url);
                 if (res.ok) {
                     const doc = new DOMParser().parseFromString(await res.text(), "text/html");
 
@@ -1526,7 +1557,7 @@
         await Promise.all(configs.map(async (api) => {
             try {
                 const hdrs = api.apiKey ? { "x-api-key": api.apiKey } : undefined;
-                const res = await fetch(`${api.url}?keys=${STORE_CATALOG},${STORE_DOWNLOADED},${STORE_EXTRA_FIELD}`, { headers: hdrs });
+                const res = await gmFetch(`${api.url}?keys=${STORE_CATALOG},${STORE_DOWNLOADED},${STORE_EXTRA_FIELD}`, { headers: hdrs });
                 if (!res.ok) return;
                 const data = await res.json();
 
@@ -1564,7 +1595,7 @@
             if (!api.apiKey) continue;
             try {
                 const hdrs = { "x-api-key": api.apiKey };
-                const getRes = await fetch(`${api.url}?keys=${STORE_CATALOG},${STORE_DOWNLOADED},${STORE_EXTRA_FIELD}`, { headers: hdrs });
+                const getRes = await gmFetch(`${api.url}?keys=${STORE_CATALOG},${STORE_DOWNLOADED},${STORE_EXTRA_FIELD}`, { headers: hdrs });
                 if (!getRes.ok) throw new Error(`GET falhou ${getRes.status}`);
                 let cloudData = {};
                 try { cloudData = await getRes.json() || {}; } catch { /* ignora */ }
@@ -1575,7 +1606,7 @@
                     [STORE_EXTRA_FIELD]: mergeDataPreferNewest([...(cloudData[STORE_EXTRA_FIELD] || []), ...getStored(STORE_EXTRA_FIELD)]),
                 };
 
-                const res = await fetch(api.url, {
+                const res = await gmFetch(api.url, {
                     method: "POST",
                     headers: { "Content-Type": "application/json", ...hdrs },
                     body: JSON.stringify(payload)
@@ -1594,7 +1625,7 @@
         for (const api of configs) {
             if (!api.apiKey) continue;
             try {
-                const res = await fetch(api.url, {
+                const res = await gmFetch(api.url, {
                     method: "DELETE",
                     headers: { "Content-Type": "application/json", "x-api-key": api.apiKey },
                     body: JSON.stringify({ url, keys: [STORE_CATALOG, STORE_DOWNLOADED, STORE_EXTRA_FIELD] })
@@ -1775,7 +1806,7 @@
                         const i = parseInt(btn.getAttribute("data-idx"), 10);
                         const api = configs[i];
                         if (!await ftConfirm(`Apagar ${label} no servidor de ${api.name}?`, "Apagar na Nuvem")) return;
-                        const res = await fetch(api.url, {
+                        const res = await gmFetch(api.url, {
                             method: "DELETE",
                             headers: { "Content-Type": "application/json", "x-api-key": api.apiKey },
                             body: JSON.stringify({ purgeKey })
@@ -1794,7 +1825,7 @@
                     const api = configs[i];
                     if (!await ftConfirm(`Restaurar LOCAL com dados de ${api.name}?`, "Restaurar Local")) return;
                     const hdrs = api.apiKey ? { "x-api-key": api.apiKey } : undefined;
-                    const res = await fetch(`${api.url}?keys=${STORE_CATALOG},${STORE_DOWNLOADED}`, { headers: hdrs });
+                    const res = await gmFetch(`${api.url}?keys=${STORE_CATALOG},${STORE_DOWNLOADED}`, { headers: hdrs });
                     if (!res.ok) { toast(`Falha: ${res.status}`); return; }
                     const data = await res.json();
                     if (data && typeof data === 'object') {
@@ -1873,12 +1904,12 @@
                         timeout: 20000,
                     });
                 });
-                
+
                 const s = document.createElement('script');
                 s.textContent = code;
                 const target = document.head || document.documentElement || document;
                 target.appendChild(s);
-                
+
                 if (unsafeWindow.Vue?.createApp) { _vueLib = unsafeWindow.Vue; return _vueLib; }
             } catch (e) {
                 console.warn('[MEO Go] Vue inline falhou:', url, e.message);
