@@ -919,6 +919,8 @@
                     let poster = doc.querySelector('meta[property="og:image"]')?.getAttribute('content')
                         || doc.querySelector("picture img")?.getAttribute("src")
                         || "";
+                    if (poster) poster = poster.replace(/_(?:s|large)\.([^.]+)$/i, '.$1');
+
 
                     item.title = title || "Sem Título";
                     item.poster = poster || "https://placehold.co/280x400?text=Sem+Capa";
@@ -1126,7 +1128,7 @@
 
             const imgEl = root.querySelector("img.catalog-cover, img");
             let poster = imgEl ? (imgEl.getAttribute("data-src") || imgEl.getAttribute("src") || "") : "";
-            if (poster) poster = poster.replace(/_s\.([^.]+)$/i, '.$1');
+            if (poster) poster = poster.replace(/_(?:s|large)\.([^.]+)$/i, '.$1');
 
             if (isCatalog) {
                 setStored(STORE_CATALOG, existing.filter(i => i.url !== href));
@@ -1155,7 +1157,7 @@
 
             const imgEl = root.querySelector("img.catalog-cover, img");
             let poster = imgEl ? (imgEl.getAttribute("data-src") || imgEl.getAttribute("src") || "") : "";
-            if (poster) poster = poster.replace(/_s\.([^.]+)$/i, '.$1');
+            if (poster) poster = poster.replace(/_(?:s|large)\.([^.]+)$/i, '.$1');
 
             if (isDownloaded) {
                 setStored(STORE_DOWNLOADED, getStored(STORE_DOWNLOADED).filter(i => i.url !== href));
@@ -2577,7 +2579,8 @@
             document.title
         );
         const posterImg = document.querySelector('.vod-img img');
-        const poster = posterImg?.src || posterImg?.getAttribute('data-src') || '';
+        let poster = posterImg?.src || posterImg?.getAttribute('data-src') || '';
+        if (poster) poster = poster.replace(/_(?:s|large)\.([^.]+)$/i, '.$1');
 
         const createBtn = (isDwn) => {
             const cache = buildStoreCache();
