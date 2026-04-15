@@ -1,4 +1,4 @@
-# media-vault
+# media-sync
 
 Userscripts de gestão de catálogo, downloads e sincronização cloud para serviços de streaming portugueses e internacionais.
 
@@ -24,7 +24,7 @@ Arquitetura: **1 Cloudflare Worker** (backend partilhado) + **1 userscript por s
 ## Estrutura do repositório
 
 ```
-media-vault/
+media-sync/
 ├── worker/
 │   └── worker.js                   # Worker Cloudflare — backend único multi-serviço
 ├── wrangler.toml                   # Configuração de deploy (Wrangler CLI)
@@ -86,7 +86,7 @@ media-vault/
 
 O `wrangler.toml` aponta para `main = "worker/worker.js"`. Garante que o ficheiro está em:
 ```
-media-vault/
+media-sync/
 └── worker/
     └── worker.js   ← aqui
 ```
@@ -139,7 +139,7 @@ Para adicionar um novo serviço no futuro, basta acrescentar o prefixo aqui — 
 wrangler deploy
 ```
 
-O URL do Worker ficará em: `https://media-vault.<teu-subdomínio>.workers.dev`
+O URL do Worker ficará em: `https://media-sync.<teu-subdomínio>.workers.dev`
 
 ---
 
@@ -159,7 +159,7 @@ Todos os pedidos requerem o header `x-api-key`.
 ### Exemplo de pedido GET
 
 ```js
-const res = await fetch("https://media-vault.xxx.workers.dev?keys=filmin_catalog_paid,filmin_downloaded_paid", {
+const res = await fetch("https://media-sync.xxx.workers.dev?keys=filmin_catalog_paid,filmin_downloaded_paid", {
   headers: { "x-api-key": "a-tua-read-key" }
 });
 const data = await res.json();

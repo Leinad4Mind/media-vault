@@ -1,5 +1,5 @@
 {
-  "name": "media-vault-agent",
-  "description": "Agente para auxiliar nas operacoes de desenvolvimento, gestao e deploy do projeto media-vault.",
+  "name": "media-sync-agent",
+  "description": "Agente para auxiliar nas operacoes de desenvolvimento, gestao e deploy do projeto media-sync.",
   "version": "1.0.0"
 }

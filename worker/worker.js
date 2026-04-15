@@ -1,5 +1,5 @@
 /**
- * Media Vault Worker — Cloudflare Workers
+ * Media Sync Worker — Cloudflare Workers
  * ─────────────────────────────────────────────────────────────────────────────
  * Worker único multi-serviço para sincronizar listas de catálogos/downloads.
  *

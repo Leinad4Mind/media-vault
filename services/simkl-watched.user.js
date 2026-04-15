@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Simkl Watched Overlay
-// @namespace    https://github.com/Blackspirits/media-vault
+// @namespace    https://github.com/Blackspirits/media-sync
 // @version      1.0.3
 // @description  Sobrepõe badge "Visto" do Simkl em FilmTwist e Filmin. OAuth via PIN, matching por título+ano, override manual de ID Simkl por item.
 // @author       Blackspirits

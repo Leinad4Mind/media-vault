@@ -2188,8 +2188,8 @@
     function openWorkerTutorialUI() {
         document.getElementById("ft-cloud-tutorial")?.remove();
 
-        const GITHUB_URL = "https://github.com/Blackspirits/media-vault/blob/main/worker/worker.js";
-        const GITHUB_REPO_URL = "https://github.com/Blackspirits/media-vault";
+        const GITHUB_URL = "https://github.com/Blackspirits/media-sync/blob/main/worker/worker.js";
+        const GITHUB_REPO_URL = "https://github.com/Blackspirits/media-sync";
 
         const mod = document.createElement("div");
         mod.id = "ft-cloud-tutorial";

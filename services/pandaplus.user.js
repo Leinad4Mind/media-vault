@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Panda+ — Gestor de Catálogo, Downloads & Sync Cloud
 // @namespace    leinad4mind.top/forum
-// @version      2.0.0
+// @version      1.9.0
 // @description  Conta e guarda filmes/séries do Panda+, sincroniza com Cloudflare Workers (multi-API), gere downloads e copiados, e apresenta uma Dashboard com filtros, posters, notas e exportação. Modifica também os links do header para incluir ?watch_more=1 e adiciona item "Destaques".
 // @author       Leinad4Mind
 // @license      MIT
@@ -14,14 +14,14 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
-// @require      https://raw.githubusercontent.com/Leinad4Mind/media-vault/main/src/media-vault-core.js
+// @require      https://raw.githubusercontent.com/Leinad4Mind/media-sync/main/src/media-sync-core.js
 // ==/UserScript==
 
-(function () {
+(function() {
     'use strict';
 
-    if (typeof window.initMediaVault !== 'function') {
-        console.error("Media-Vault Core não carregou corrertamente!");
+    if (typeof window.initMediaSync !== 'function') {
+        console.error("Media-Sync Core não carregou corrertamente!");
         return;
     }
 
@@ -30,18 +30,18 @@
         BRAND_COLOR: "#ffa61a",
         CARD_ROOT_SELECTOR: ".thumbnail",
         BASE_URL: "https://pandaplus.pt",
-
-        isRelevantItem: function (url) {
+        
+        isRelevantItem: function(url) {
             if (!url) return false;
             const s = url.toLowerCase();
             return s.includes("/filmes-e-series/") || s.includes("/conteudo/") || s.includes("/vod/");
         },
 
-        extractCardDetails: function (root) {
+        extractCardDetails: function(root) {
             const linkEl = root.nodeName === "A" ? root : root.querySelector("a");
             let href = linkEl?.href || linkEl?.getAttribute("href") || "";
             if (href.startsWith('/')) href = "https://pandaplus.pt" + href;
-
+            
             let title = linkEl?.getAttribute("aria-label") || "";
             if (!title) {
                 const imgEl = root.querySelector("img");
@@ -84,10 +84,10 @@
             };
         },
 
-        injectHeaderMods: function () { },
-        injectDetailPageButtons: function () { }
+        injectHeaderMods: function() { },
+        injectDetailPageButtons: function() { }
     };
 
-    window.initMediaVault(context);
+    window.initMediaSync(context);
 
 })();

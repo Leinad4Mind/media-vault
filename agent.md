@@ -1,9 +1,9 @@
-# Media-Vault Agent Instructions
+# Media-Sync Agent Instructions
 
 Este ficheiro funciona como um guia de instruções base (System Prompt/Context) para agentes de Inteligência Artificial que trabalhem neste repositório. O objetivo é que qualquer IA tenha de imediato num só local o contexto e as regras do projeto baseadas na arquitetura estabelecida.
 
 ## Visão Geral do Projeto
-O repositório `media-vault` consiste num sistema distribuído que sincroniza progressos de visualização (vistos), listas de downloads e catálogos para vários serviços de streaming (ex: Filmin, FilmTwist, etc.).
+O repositório `media-sync` consiste num sistema distribuído que sincroniza progressos de visualização (vistos), listas de downloads e catálogos para vários serviços de streaming (ex: Filmin, FilmTwist, etc.).
 - **Backend**: 1 único Cloudflare Worker atuando como router/API de acesso. Todas as informações estão alocadas em KV namespaces do Cloudflare (`MEDIA_KV`).
 - **Frontend**: 1 userscript Tampermonkey por cada serviço de streaming suportado. Servem o catálogo, gerem a persistência por localStorage antes do sync e comunicam com a layer da Cloud.
 
