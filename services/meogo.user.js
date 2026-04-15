@@ -57,11 +57,11 @@
  *
  * v1.4.0 (2026-04-14) — Cor da marca + título do painel flutuante
  *           • Cor de destaque alterada de vermelho (#dc2626) para laranja
- *             Panda (#ffa61a) em todo o painel flutuante:
+ *             Panda (#38bdf8) em todo o painel flutuante:
  *             gradient do header, ponto de estado, toast border, box-shadow,
  *             stats de catálogo, border-left dos botões de ação
  *           • Título do painel flutuante corrigido: PANDA_PLUS → PANDA+
- *           • Botão "Gerir APIs cloud" muda de roxo para laranja (#ffa61a)
+ *           • Botão "Gerir APIs cloud" muda de roxo para laranja (#38bdf8)
  *
  * v1.5.0 (2026-04-15) — Hover nos cards da homepage
  *           • applyCardState() marca cada <a> processado com data-ft-card="1"
@@ -74,13 +74,13 @@
  * v1.6.0 (2026-04-15) — Dashboard — identidade visual MEO Go
  *           • Título do dashboard: PANDA_PLUS → PANDA+
  *           • Ponto de estado no header do dashboard: vermelho → laranja
- *             (#ffa61a) com glow a combinar
+ *             (#38bdf8) com glow a combinar
  *           • Focus dos inputs no dashboard: borda laranja em vez de vermelha
- *           • Hover nos títulos dos cards do dashboard: laranja (#ffa61a)
+ *           • Hover nos títulos dos cards do dashboard: laranja (#38bdf8)
  *           • Botão "Gerir APIs cloud" no painel flutuante: roxo → laranja
  *
  * v1.7.0 (2026-04-15) — Modal "APIS CLOUD" — identidade visual MEO Go
- *           • Gradient do header da modal: vermelho → laranja (#ffa61a)
+ *           • Gradient do header da modal: vermelho → laranja (#38bdf8)
  *           • Ponto de estado e glow: vermelho → laranja
  *           • Borda exterior da caixa (glow ring): vermelho → laranja
  *           • accent-color das checkboxes: vermelho → laranja
@@ -586,8 +586,8 @@
                 display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);`;
             const box = document.createElement("div");
             box.style.cssText = `background:#0a0e16;padding:28px;border-radius:14px;width:90%;max-width:380px;
-                border:1px solid rgba(255,166,26,.15);text-align:center;font-family:system-ui,sans-serif;
-                box-shadow:0 12px 40px rgba(0,0,0,.8),0 0 0 1px rgba(255,166,26,.05);`;
+                border:1px solid rgba(56,189,248,.15);text-align:center;font-family:system-ui,sans-serif;
+                box-shadow:0 12px 40px rgba(0,0,0,.8),0 0 0 1px rgba(56,189,248,.05);`;
             box.innerHTML = `
                 <div style="font-size:35px;margin-bottom:14px;">⚠️</div>
                 <h2 style="margin:0 0 12px;font-size:19px;color:#f1f5f9;letter-spacing:.02em;">${title}</h2>
@@ -1265,7 +1265,7 @@
         statsEl.innerHTML =
             `<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(255,255,255,.05);border-radius:9px;overflow:hidden;">
                 ${cell(STAT_ICONS.page, '#94a3b8', pg, 'Na página')}
-                ${cell(STAT_ICONS.catalog, '#ffa61a', cat, 'Catálogo')}
+                ${cell(STAT_ICONS.catalog, '#38bdf8', cat, 'Catálogo')}
                 ${cell(STAT_ICONS.download, '#10b981', dwn, 'Transferidos')}
                 ${cell(STAT_ICONS.copy, cpy > 0 ? '#f59e0b' : '#334155', cpy, 'Copiados')}
             </div>`;
@@ -1283,7 +1283,7 @@
         } else {
             b.textContent = label;
         }
-        const accent = opts.accent || "rgba(255,166,26,.6)";
+        const accent = opts.accent || "rgba(56,189,248,.6)";
         const danger = opts.danger || false;
         b.style.cssText = `padding:10px 12px;border-radius:10px;
             background:rgba(255,255,255,.05);
@@ -1295,7 +1295,7 @@
             transition:background .15s,border-color .15s,color .15s;`;
         b.addEventListener("mouseover", () => {
             b.style.background = danger ? "rgba(239,68,68,.1)" : "rgba(255,255,255,.09)";
-            b.style.borderLeftColor = danger ? "#f87171" : "rgba(255,166,26,.9)";
+            b.style.borderLeftColor = danger ? "#f87171" : "rgba(56,189,248,.9)";
         });
         b.addEventListener("mouseout", () => {
             b.style.background = "rgba(255,255,255,.05)";
@@ -1317,7 +1317,7 @@
         panel.style.cssText = `position:fixed;right:${state.pos.right !== undefined ? state.pos.right : 14}px;${topOrBottom}
             z-index:999999;width:${state.min ? 180 : 320}px;border-radius:14px;
             background:rgba(8,12,20,.95);border:1px solid rgba(255,255,255,.09);
-            box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 0 1px rgba(255,166,26,.05);
+            box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 0 1px rgba(56,189,248,.05);
             backdrop-filter:blur(12px);overflow:hidden;
             font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#fff;white-space:pre-line;`;
 
@@ -1325,14 +1325,14 @@
         const header = document.createElement("div");
         header.style.cssText = `display:flex;align-items:center;justify-content:space-between;
             padding:11px 10px 11px 13px;cursor:move;user-select:none;
-            background:linear-gradient(105deg,rgba(255,166,26,.22) 0%,rgba(8,12,20,0) 65%);
+            background:linear-gradient(105deg,rgba(56,189,248,.22) 0%,rgba(8,12,20,0) 65%);
             border-bottom:1px solid rgba(255,255,255,.07);`;
 
         const title = document.createElement("div");
         title.style.cssText = "display:flex;align-items:center;gap:8px;";
         title.innerHTML = `
-            <span style="width:7px;height:7px;border-radius:50%;background:#ffa61a;
-                box-shadow:0 0 8px rgba(255,166,26,.8);flex-shrink:0;display:inline-block;"></span>
+            <span style="width:7px;height:7px;border-radius:50%;background:#38bdf8;
+                box-shadow:0 0 8px rgba(56,189,248,.8);flex-shrink:0;display:inline-block;"></span>
             <span style="font-weight:700;font-size:14.5px;letter-spacing:.14em;color:#f1f5f9;">MEO Go</span>`;
 
         const svgMin = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
@@ -1370,7 +1370,7 @@
         btnMark.style.flex = "1"; btnReset.style.flex = "1";
         rowCopied.append(btnMark, btnReset);
 
-        const btnAPIs = makeButton("Gerir APIs cloud", openApiManagerUI, { accent: "rgba(255,166,26,.7)", icon: "api" });
+        const btnAPIs = makeButton("Gerir APIs cloud", openApiManagerUI, { accent: "rgba(56,189,248,.7)", icon: "api" });
         btnAPIs.style.flex = "1";
 
         const rowBackup = document.createElement("div"); rowBackup.style.cssText = "display:flex;gap:7px;";
@@ -1626,7 +1626,7 @@
         box.style.cssText = `background:#0a0e16;border:1px solid rgba(255,255,255,.09);padding:0;width:680px;max-width:95%;
             border-radius:14px;color:#e2e8f0;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;
             font-family:system-ui,-apple-system,Segoe UI,sans-serif;
-            box-shadow:0 24px 60px rgba(0,0,0,.7),0 0 0 1px rgba(255,166,26,.06);`;
+            box-shadow:0 24px 60px rgba(0,0,0,.7),0 0 0 1px rgba(56,189,248,.06);`;
 
         const iSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 7l3 3-3 3"/><path d="M8 13h8"/><rect x="2" y="3" width="20" height="18" rx="2"/>
@@ -1637,7 +1637,7 @@
         const inputCSS = `width:100%;padding:9px 12px;background:rgba(255,255,255,.04);color:#e2e8f0;
             border:1px solid rgba(255,255,255,.09);border-radius:8px;box-sizing:border-box;
             font-size:15.5px;font-family:inherit;outline:none;transition:border-color .15s;`;
-        const checkCSS = `accent-color:#ffa61a;width:14px;height:14px;cursor:pointer;`;
+        const checkCSS = `accent-color:#38bdf8;width:14px;height:14px;cursor:pointer;`;
 
         const renderList = () => {
             const configs = getApiConfigs();
@@ -1683,9 +1683,9 @@
 
             box.innerHTML = `
             <!-- Header -->
-            <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(105deg,rgba(255,166,26,.1),rgba(8,12,20,0));">
+            <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(105deg,rgba(56,189,248,.1),rgba(8,12,20,0));">
                 <div style="display:flex;align-items:center;gap:10px;">
-                    <span style="width:7px;height:7px;border-radius:50%;background:#ffa61a;box-shadow:0 0 8px rgba(255,166,26,.8);display:inline-block;"></span>
+                    <span style="width:7px;height:7px;border-radius:50%;background:#38bdf8;box-shadow:0 0 8px rgba(56,189,248,.8);display:inline-block;"></span>
                     <span style="font-size:15.5px;font-weight:700;letter-spacing:.12em;color:#f1f5f9;">APIS CLOUD</span>
                 </div>
                 <button type="button" id="ft-tut-btn" style="padding:6px 12px;background:rgba(139,92,246,.2);color:#c4b5fd;border:1px solid rgba(139,92,246,.3);border-radius:7px;font-size:14px;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:5px;">
@@ -1971,7 +1971,7 @@
                 color:#e2e8f0 !important; padding:9px 13px !important; border-radius:8px !important;
                 outline:none; transition:border-color .15s; font-size:16px;
                 color-scheme:dark; }
-            .ft-input:focus { border-color:rgba(255,166,26,.5) !important; }
+            .ft-input:focus { border-color:rgba(56,189,248,.5) !important; }
             .ft-input option { background:#0f172a !important; color:#e2e8f0 !important; }
             .ft-btn { border:none;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:600;font-size:15.5px;
                 transition:opacity .15s,transform .1s; }
@@ -1994,7 +1994,7 @@
   <!-- Header -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;padding-bottom:18px;border-bottom:1px solid rgba(255,255,255,.08);">
     <div style="display:flex;align-items:center;gap:12px;">
-      <span style="width:9px;height:9px;border-radius:50%;background:#ffa61a;box-shadow:0 0 10px rgba(255,166,26,.9);display:inline-block;"></span>
+      <span style="width:9px;height:9px;border-radius:50%;background:#38bdf8;box-shadow:0 0 10px rgba(56,189,248,.9);display:inline-block;"></span>
       <span style="font-size:18px;font-weight:700;letter-spacing:.12em;color:#f1f5f9;">PANDA+</span>
       <span style="font-size:14px;color:#94a3b8;letter-spacing:.06em;font-weight:500;">DASHBOARD</span>
     </div>
@@ -2090,7 +2090,7 @@
       <div style="padding:10px 12px;display:flex;flex-direction:column;flex-grow:1;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:4px;">
           <a :href="item.url" target="_blank" style="flex-grow:1;color:#e2e8f0;text-decoration:none;font-weight:600;font-size:15.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4;"
-           @mouseenter="$event.target.style.color='#ffa61a'" @mouseleave="$event.target.style.color='#e2e8f0'">{{ item.title||'Sem Título' }}</a>
+           @mouseenter="$event.target.style.color='#38bdf8'" @mouseleave="$event.target.style.color='#e2e8f0'">{{ item.title||'Sem Título' }}</a>
           <div v-if="hasWriteAccess(item)" style="display:flex;gap:2px;flex-shrink:0;">
             <button @click.prevent="openEditModal(item)" style="background:transparent;color:#475569;border:none;border-radius:4px;padding:3px;cursor:pointer;font-size:15px;transition:color .15s;" @mouseenter="$event.target.style.color='#e2e8f0'" @mouseleave="$event.target.style.color='#475569'" title="Editar">✏️</button>
             <button @click.prevent="deleteItem(item)"   style="background:transparent;color:#475569;border:none;border-radius:4px;padding:3px;cursor:pointer;font-size:15px;transition:color .15s;" @mouseenter="$event.target.style.color='#ef4444'" @mouseleave="$event.target.style.color='#475569'" title="Eliminar">🗑️</button>
