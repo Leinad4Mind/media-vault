@@ -749,7 +749,7 @@
                     <div style="display:flex;gap:10px;">
                         <input id="api-n" placeholder="Nome de Referência (ex: Worker Principal)" value="${api.name}" style="flex:1;padding:12px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#fff;font-family:monospace;font-size:13px;">
                     </div>
-                    <input id="api-u" placeholder="https://media-sync-api.teu-user.workers.dev" value="${api.url}" style="width:100%;padding:12px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#fff;margin-top:10px;font-family:monospace;font-size:13px;">
+                    <input id="api-u" placeholder="https://media-vault-api.teu-user.workers.dev" value="${api.url}" style="width:100%;padding:12px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#fff;margin-top:10px;font-family:monospace;font-size:13px;">
                 </div>
 
                 <!-- Passo 2 -->

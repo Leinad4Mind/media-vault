@@ -1,11 +1,11 @@
 ---
-name: Gestão de Userscripts Media-Sync
-description: Regras e convenções sobre como construir e gerir os userscripts que interagem com o Worker do media-sync (Cloudflare KV).
+name: Gestão de Userscripts Media-Vault
+description: Regras e convenções sobre como construir e gerir os userscripts que interagem com o Worker do media-vault (Cloudflare KV).
 ---
 
 # Gestão de Userscripts e Cloudflare Worker
 
-Quando estiveres a trabalhar no código do `media-sync` deves seguir estas normas rigorosamente.
+Quando estiveres a trabalhar no código do `media-vault` deves seguir estas normas rigorosamente.
 
 ## 1. Regras do Backend (Cloud Worker)
 - O Worker lida com múltiplos serviços baseados em **Prefixos KV**.
