@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MEO Go — Gestor de Catálogo, Downloads & Sync Cloud
 // @namespace    leinad4mind.top/forum
-// @version      1.9.1
+// @version      2.3.1
 // @description  Conta e guarda filmes/séries do MEO Go, sincroniza com Cloudflare Workers (multi-API), gere downloads e copiados, e apresenta uma Dashboard com filtros, posters, notas e exportação. Modifica também os links do header para incluir ?watch_more=1 e adiciona item "Destaques".
 // @author       Leinad4Mind
 // @license      MIT
@@ -107,6 +107,46 @@
  *           • CSS de hover simplificado: apenas [data-ft-card]:hover — não depende
  *             de .relative ou a.mcard que não existem no MEO Go
  *           • box-shadow de estado aplicado no root (.item-wrapper) em vez do linkEl
+ *
+ * v2.0.0 (2026-04-15) — Correção de 3 bugs (revertido parcialmente em v2.0.1)
+ *           • injectDetailPageButtons() usa window.location.href em vez de
+ *             .pathname para a verificação isRelevantFTItem
+ *           • Click handler nos botões de detalhe lê o estado actual no momento
+ *             do clique (curCache) em vez do estado do closure → toggle correto
+ *           • Badge do histórico (📜) sempre visível: opacity:0→1 no CSS base
+ *           ⚠ isRelevantFTItem alterada ERRONEAMENTE para /conteudo/ e /vod/
+ *             (revertido em v2.0.1)
+ *
+ * v2.0.1 (2026-04-15) — Hotfix: restaurar isRelevantFTItem
+ *           • isRelevantFTItem() revertida para /videoclube/detalhe que é o
+ *             padrão correcto dos URLs do MEO Go (href="/videoclube/detalhe?vod=")
+ *           • A alteração anterior para /conteudo/ e /vod/ quebrava os overlays
+ *             em todos os cards porque nenhum URL contém esses padrões
+ * v2.1.0 (2026-04-15) — Fix crítico: normUrl preserva query params
+ *           • normUrl() já não apaga o search string (?vod=XXXXX).
+ *             Os URLs do MEO Go usam o query param como ID do conteúdo;
+ *             ao apagá-lo todos os cards ficavam com o mesmo URL
+ *             (https://meogo.meo.pt/videoclube/detalhe) e o mergeData
+ *             colapsava tudo num só registo — razão pela qual o
+ *             "Guardar catálogo" só guardava 1 item e os badges nunca
+ *             correspondiam a cards individuais
+ * v2.2.0 (2026-04-15) — Fix: botões na página de detalhe
+ *           • injectDetailPageButtons() reescrita com os seletores reais
+ *             do MEO Go: seletor de container é .vod-details ul.hyperlinks,
+ *             título em .vod-details h2, poster em .vod-img img
+ *           • Botões injetados como <li>+<a> dentro da ul.hyperlinks existente
+ *             (integra visualmente com o layout nativo: Alugar + Ver Trailer)
+ *           • Removidos os seletores antigos (.details-web .buttons-web,
+ *             .details-mobile .secondary-buttons-mobile, .title01, etc)
+ *             que não existiam no DOM do MEO Go
+ * v2.3.1 (2026-04-15) — Fix: Vue dashboard em branco (sandbox isolation)
+ *           • new Function() executava o Vue no sandbox isolado do Tampermonkey
+ *             (com Symbol/Proxy próprios) mas o DOM é do contexto da página —
+ *             incompatibilidade silentária → Vue montava mas não renderizava
+ *           • Estratégia 1: <script src> direto (sem CSP, mais rápido)
+ *           • Estratégia 2: GM_xmlhttpRequest + Blob URL (CSP de rede ignorada;
+ *             o blob corre no contexto real da página com os Symbol/Proxy
+ *             corretos → Vue renderiza normalmente)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -117,20 +157,20 @@
        CONSTANTES
        ===================================================================== */
 
-    const STORE_CATALOG = "MEO Go_catalog";        // histórico visto/guardado
-    const STORE_DOWNLOADED = "MEO Go_downloaded";     // transferidos definitivamente
-    const STORE_DOWNLOAD_LIST = "MEO Go_download_list";  // copiados temporários
-    const STORE_EXTRA_FIELD = "MEO Go_extra_field";    // notas de série
-    const STORE_API_CONFIGS = "MEO Go_api_configs";    // configurações das APIs cloud
+    const STORE_CATALOG = "meogo_catalog";        // histórico visto/guardado
+    const STORE_DOWNLOADED = "meogo_downloaded";     // transferidos definitivamente
+    const STORE_DOWNLOAD_LIST = "meogo_download_list";  // copiados temporários
+    const STORE_EXTRA_FIELD = "meogo_extra_field";    // notas de série
+    const STORE_API_CONFIGS = "meogo_api_configs";    // configurações das APIs cloud
 
-    const UI_POS_KEY = "MEO Go_ui_pos_v1";
-    const UI_MIN_KEY = "MEO Go_ui_min_v1";
+    const UI_POS_KEY = "meogo_ui_pos_v1";
+    const UI_MIN_KEY = "meogo_ui_min_v1";
 
     // Selector raiz dos cards (agora inclui as páginas de episódio)
     const CARD_ROOT_SELECTOR = ".item-wrapper";
 
     // URL base do site
-    const SITE_ORIGIN = "https://MEO Go.pt";
+    const SITE_ORIGIN = "https://meogo.meo.pt";
 
     const AUTO_UPDATE_MS = 650;
 
@@ -143,14 +183,14 @@
     let cloudExtraFields = [];
     let _cloudFetchSeq = 0;
 
-    let hideDownloaded = GM_getValue("MEO Go_hide_downloaded_v1", false);
-    let hideHistory = GM_getValue("MEO Go_hide_history_v1", false);
+    let hideDownloaded = GM_getValue("meogo_hide_downloaded_v1", false);
+    let hideHistory = GM_getValue("meogo_hide_history_v1", false);
 
     /* =====================================================================
        CACHE DE IMAGENS (IndexedDB)
        ===================================================================== */
 
-    const IMG_DB_NAME = "MEO Go_img_cache_db";
+    const IMG_DB_NAME = "meogo_img_cache_db";
     const IMG_STORE_NAME = "images";
     const OBJ_URL_CAP = 400;
 
@@ -250,7 +290,7 @@
     const globStyle = document.createElement('style');
     globStyle.innerHTML = `
         /* ---- Cloud badges ---- */
-        .ft-cloud-badge { opacity:0; transition:opacity 0.18s ease !important; }
+        .ft-cloud-badge { opacity:1; transition:opacity 0.18s ease !important; }
         /* ---- Card hover overlay ---- */
         .ft-card-overlay {
             position:absolute; inset:0; z-index:200;
@@ -261,7 +301,7 @@
         }
         /* Hover — o data-ft-card está no root (.item-wrapper), overlay está dentro do linkEl (filho direto do root) */
         [data-ft-card]:hover .ft-card-overlay { opacity:1; pointer-events:auto; }
-        [data-ft-card]:hover .ft-cloud-badge { opacity:1 !important; }
+        [data-ft-card]:hover .ft-cloud-badge { opacity:1 !important; } /* already visible but ensure */
         .ft-card-overlay-btns {
             display:flex; gap:8px; padding:10px; justify-content:center;
         }
@@ -338,7 +378,7 @@
         const abs = toAbsUrl(urlStr);
         try {
             const u = new URL(abs);
-            u.search = "";
+            // NÃO apagar u.search — o MEO Go usa ?vod= como ID do conteúdo
             let s = u.toString();
             if (s.endsWith('/')) s = s.slice(0, -1);
             return s;
@@ -402,6 +442,7 @@
     function isRelevantFTItem(url) {
         if (!url) return false;
         const s = url.toLowerCase();
+        // MEO Go usa /videoclube/detalhe?vod= para todos os conteúdos
         return s.includes("/videoclube/detalhe");
     }
 
@@ -1389,9 +1430,9 @@
 
         wrapper.append(
             createBtn("ft-hide-down", "Mostrar transferidos", "Ocultar transferidos", hideDownloaded,
-                (v) => { hideDownloaded = v; GM_setValue("MEO Go_hide_downloaded_v1", v); highlightSavedLinks(); }),
+                (v) => { hideDownloaded = v; GM_setValue("meogo_hide_downloaded_v1", v); highlightSavedLinks(); }),
             createBtn("ft-hide-hist", "Mostrar catálogo", "Ocultar catálogo", hideHistory,
-                (v) => { hideHistory = v; GM_setValue("MEO Go_hide_history_v1", v); highlightSavedLinks(); })
+                (v) => { hideHistory = v; GM_setValue("meogo_hide_history_v1", v); highlightSavedLinks(); })
         );
 
         // Insere após os select filters
@@ -1767,21 +1808,75 @@
        DASHBOARD (Vue 3)
        ===================================================================== */
 
+    // Cache do Vue carregado via GM_xmlhttpRequest (sobrevive entre chamadas)
+    let _vueLib = null;
+
+    async function _loadVue() {
+        if (_vueLib) return _vueLib;
+        if (unsafeWindow.Vue) { _vueLib = unsafeWindow.Vue; return _vueLib; }
+
+        const CDNS = [
+            'https://unpkg.com/vue@3/dist/vue.global.prod.js',
+            'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js',
+        ];
+
+        // Estratégia 1: <script src> direto (funciona sem CSP restrita, contexto da página)
+        for (const url of CDNS) {
+            try {
+                await new Promise((res, rej) => {
+                    const s = document.createElement('script');
+                    s.src = url; s.crossOrigin = 'anonymous';
+                    s.onload = res; s.onerror = rej;
+                    document.head.appendChild(s);
+                });
+                if (unsafeWindow.Vue?.createApp) { _vueLib = unsafeWindow.Vue; return _vueLib; }
+            } catch { /* CSP bloqueou, tentar próxima estratégia */ }
+        }
+
+        // Estratégia 2: GM_xmlhttpRequest + Blob URL (ignora CSP de rede; executa no contexto da página)
+        // O Blob URL corre como script da página → Symbol/Proxy corretos → Vue renderiza corretamente
+        for (const url of CDNS) {
+            try {
+                const code = await new Promise((resolve, reject) => {
+                    GM_xmlhttpRequest({
+                        method: 'GET', url,
+                        onload: (r) => r.status >= 200 && r.status < 300
+                            ? resolve(r.responseText) : reject(new Error('HTTP ' + r.status)),
+                        onerror: () => reject(new Error('Rede')),
+                        ontimeout: () => reject(new Error('Timeout')),
+                        timeout: 20000,
+                    });
+                });
+
+                const lib = await new Promise((resolve, reject) => {
+                    const blob = new Blob([code], { type: 'application/javascript' });
+                    const blobUrl = URL.createObjectURL(blob);
+                    const s = document.createElement('script');
+                    s.src = blobUrl;
+                    s.onload = () => {
+                        URL.revokeObjectURL(blobUrl);
+                        resolve(unsafeWindow.Vue);
+                    };
+                    s.onerror = () => {
+                        URL.revokeObjectURL(blobUrl);
+                        reject(new Error('blob: bloqueado pelo CSP'));
+                    };
+                    document.head.appendChild(s);
+                });
+                if (lib?.createApp) { _vueLib = lib; return _vueLib; }
+            } catch (e) { console.warn('[MEO Go] Vue blob falhou:', url, e.message); }
+        }
+
+        throw new Error('Não foi possível carregar Vue (CDN bloqueado pelo CSP do site).');
+    }
+
     async function openDashboardUI() {
         document.getElementById("ft-dashboard")?.remove();
 
+        let VueLib;
         try {
-            if (!unsafeWindow.Vue) {
-                await new Promise((resolve, reject) => {
-                    const s = document.createElement('script');
-                    s.src = 'https://unpkg.com/vue@3/dist/vue.global.js';
-                    s.onload = resolve; s.onerror = () => reject(new Error('Falha ao carregar Vue.js'));
-                    document.head.appendChild(s);
-                });
-            }
-        } catch { toast("Falha ao carregar Vue CDN."); return; }
-
-        const VueLib = unsafeWindow.Vue;
+            VueLib = await _loadVue();
+        } catch (e) { toast("Falha ao carregar Vue: " + e.message); return; }
 
         const localCatalog = getStored(STORE_CATALOG).length;
         const localDown = getStored(STORE_DOWNLOADED).length;
@@ -2352,16 +2447,16 @@
         }
         // Migrar api_configs
         const oldApiKey = "ft_api_configs";
-        const newApiKey = "MEO Go_api_configs";
+        const newApiKey = "meogo_api_configs";
         const oldApi = GM_getValue(oldApiKey, null);
         const newApi = GM_getValue(newApiKey, null);
         if (oldApi && !newApi) { GM_setValue(newApiKey, oldApi); GM_setValue(oldApiKey, "[]"); migrated++; }
         // Migrar hide/pos keys
         [
-            ["ft_hide_downloaded_v1", "MEO Go_hide_downloaded_v1"],
-            ["ft_hide_history_v1", "MEO Go_hide_history_v1"],
-            ["ft_ui_pos_v1", "MEO Go_ui_pos_v1"],
-            ["ft_ui_min_v1", "MEO Go_ui_min_v1"],
+            ["ft_hide_downloaded_v1", "meogo_hide_downloaded_v1"],
+            ["ft_hide_history_v1", "meogo_hide_history_v1"],
+            ["ft_ui_pos_v1", "meogo_ui_pos_v1"],
+            ["ft_ui_min_v1", "meogo_ui_min_v1"],
         ].forEach(([ok, nk]) => {
             const ov = GM_getValue(ok, null);
             const nv = GM_getValue(nk, null);
@@ -2449,51 +2544,56 @@
        ===================================================================== */
 
     function injectDetailPageButtons() {
-        if (!isRelevantFTItem(window.location.pathname)) return;
+        if (!isRelevantFTItem(window.location.href)) return;
 
-        const desktopContainer = document.querySelector('.details-web .buttons-web');
-        const mobileContainer = document.querySelector('.details-mobile .secondary-buttons-mobile');
+        // Seletores reais do MEO Go (página de detalhe: /videoclube/detalhe?vod=)
+        // Estrutura: .vod-details > h2 (título), .vod-img img (poster), .vod-details ul.hyperlinks (botões)
+        const btnContainer = document.querySelector('.vod-details ul.hyperlinks');
 
-        if (!desktopContainer && !mobileContainer) return;
+        if (!btnContainer) return;
         if (document.querySelector('.ft-detail-buttons-injected')) return;
 
         const href = normUrl(window.location.href);
-        const cache = buildStoreCache();
-        const isDownloaded = cache.setDownloaded.has(href);
-        const isCatalog = cache.setCatalog.has(href);
 
-        const title = safeTrim(document.querySelector('.title01')?.textContent || document.querySelector('.mobileTitle01')?.textContent || document.title);
-        const posterEl = document.querySelector('.detail-header-web') || document.querySelector('.detail-header-mobile');
-        const posterMatch = posterEl?.style.backgroundImage.match(/url\(\s*["']?(.*?)["']?\s*\)/);
-        const poster = posterMatch ? posterMatch[1].replace(/["']/g, '') : "";
+        const title = safeTrim(
+            document.querySelector('.vod-details h2')?.textContent ||
+            document.querySelector('h2')?.textContent ||
+            document.title
+        );
+        const posterImg = document.querySelector('.vod-img img');
+        const poster = posterImg?.src || posterImg?.getAttribute('data-src') || '';
 
-        const createBtn = (isMb, isDwn) => {
-            const btn = document.createElement("button");
-            btn.className = `focusable ft-detail-buttons-injected ${isMb ? 'btn-icon-web' : 'btn-icon-left-web'}`;
-            btn.style.cssText = isMb
-                ? "margin-left:8px; padding:0 12px; border-radius:24px; font-weight:bold; height:40px; display:inline-flex; align-items:center; font-size:15px; transition:all 0.2s;"
-                : "margin-left:12px; padding:0 24px; border-radius:24px; font-weight:bold; height:48px; display:inline-flex; align-items:center; transition:all 0.2s;";
+        const createBtn = (isDwn) => {
+            const cache = buildStoreCache();
+            const isDownloaded = cache.setDownloaded.has(href);
+            const isCatalog = cache.setCatalog.has(href);
+
+            const li = document.createElement("li");
+            const btn = document.createElement("a");
+            btn.className = `ft-detail-buttons-injected btn-fill`;
+            btn.href = "#";
+            btn.style.cssText = "padding:0 18px; border-radius:24px; font-weight:bold; height:40px; display:inline-flex; align-items:center; font-size:15px; transition:all 0.2s; cursor:pointer; text-decoration:none;";
 
             if (isDwn) { // Downloaded
                 if (isDownloaded) {
-                    btn.innerHTML = isMb ? `✅ <span style="margin-left:4px">Retirar</span>` : `✅ <span style="margin-left:8px">Retirar Transferido</span>`;
-                    btn.style.backgroundColor = "#10b981"; // Green
+                    btn.innerHTML = `✅ <span style="margin-left:6px">Retirar Transferido</span>`;
+                    btn.style.backgroundColor = "#10b981";
                     btn.style.color = "#fff";
                     btn.style.border = "none";
                 } else {
-                    btn.innerHTML = isMb ? `❌ <span style="margin-left:4px">Marcar</span>` : `❌ <span style="margin-left:8px">Marcar Transferido</span>`;
-                    btn.style.backgroundColor = "#ef4444"; // Red
+                    btn.innerHTML = `❌ <span style="margin-left:6px">Marcar Transferido</span>`;
+                    btn.style.backgroundColor = "#ef4444";
                     btn.style.color = "#fff";
                     btn.style.border = "none";
                 }
             } else { // Catalog
                 if (isCatalog) {
-                    btn.innerHTML = isMb ? `✓ <span style="margin-left:4px">Retirar</span>` : `✓ <span style="margin-left:8px">Retirar (Catálogo)</span>`;
+                    btn.innerHTML = `✓ <span style="margin-left:6px">Retirar (Catálogo)</span>`;
                     btn.style.backgroundColor = "#e5e7eb";
                     btn.style.color = "#4b5563";
                     btn.style.border = "1px solid #d1d5db";
                 } else {
-                    btn.innerHTML = isMb ? `💾 <span style="margin-left:4px">Catálogo</span>` : `💾 <span style="margin-left:8px">Catálogo</span>`;
+                    btn.innerHTML = `💾 <span style="margin-left:6px">Catálogo</span>`;
                     btn.style.backgroundColor = "#3b82f6";
                     btn.style.color = "#fff";
                     btn.style.border = "none";
@@ -2502,20 +2602,23 @@
 
             btn.addEventListener("click", async (e) => {
                 e.preventDefault(); e.stopPropagation();
+                // Ler estado actual no momento do clique
+                const curCache = buildStoreCache();
+                const curIsDownloaded = curCache.setDownloaded.has(href);
+                const curIsCatalog = curCache.setCatalog.has(href);
                 if (isDwn) {
                     const existing = getStored(STORE_DOWNLOADED);
-                    if (isDownloaded) {
+                    if (curIsDownloaded) {
                         setStored(STORE_DOWNLOADED, existing.filter(i => i.url !== href));
                         toast("Removido de 'Já temos'.");
                     } else {
                         setStored(STORE_DOWNLOADED, mergeData([...existing, { url: href, title, poster, saved_at: Date.now() }]));
                         toast("✅ Guardado como 'Já temos'!");
-                        const cat = getStored(STORE_CATALOG);
-                        setStored(STORE_CATALOG, cat.filter(i => i.url !== href));
+                        setStored(STORE_CATALOG, getStored(STORE_CATALOG).filter(i => i.url !== href));
                     }
                 } else {
                     const existing = getStored(STORE_CATALOG);
-                    if (isCatalog) {
+                    if (curIsCatalog) {
                         setStored(STORE_CATALOG, existing.filter(i => i.url !== href));
                         toast("Removido do catálogo.");
                     } else {
@@ -2524,131 +2627,19 @@
                     }
                 }
                 await saveToCloud();
-
-                // Forçar renderização de novos botões em vez de update simples
-                document.querySelectorAll('.ft-detail-buttons-injected').forEach(b => b.remove());
+                // Re-injetar botões com estado atualizado
+                document.querySelectorAll('.ft-detail-buttons-injected').forEach(b => b.closest('li')?.remove() || b.remove());
                 injectDetailPageButtons();
                 refreshAllCards(); updateStats();
             });
-            return btn;
+
+            li.appendChild(btn);
+            return li;
         };
 
-        if (desktopContainer && !desktopContainer.querySelector('.ft-detail-buttons-injected')) {
-            desktopContainer.appendChild(createBtn(false, false)); // Catalog
-            desktopContainer.appendChild(createBtn(false, true));  // Downloaded
-        }
-        if (mobileContainer && !mobileContainer.querySelector('.ft-detail-buttons-injected')) {
-            mobileContainer.appendChild(createBtn(true, false));
-            mobileContainer.appendChild(createBtn(true, true));
-        }
-
-        // ---- INJETAR MARCAR VISÍVEIS (Temporada/Área) ----
-        // O selector procura pelo swiper-tabs (Temporadas) ou diretamente a grelha de episódios caso o filme/série nao tenha separador
-        let gridRoot = document.querySelector('.swiper-tabs');
-        if (!gridRoot) {
-            const epGrids = document.querySelectorAll('.filters-content.grid');
-            if (epGrids.length > 0) gridRoot = epGrids[0]; // fallback
-        }
-
-        if (gridRoot && !document.querySelector('.ft-mark-season-btn')) {
-            const wrapper = document.createElement("div");
-            wrapper.className = "ft-mark-season-btn"; // classe de tracking
-            wrapper.style.display = "flex";
-            wrapper.style.gap = "8px";
-            wrapper.style.margin = "8px 0";
-
-            if (gridRoot.classList.contains('swiper-tabs')) {
-                wrapper.style.justifyContent = "flex-end";
-                wrapper.style.width = "100%";
-            }
-
-            const btnSeason = document.createElement("button");
-            btnSeason.className = "focusable btn-icon-left-web text-btnText02";
-            btnSeason.style.cssText = "padding:0 16px; border-radius:24px; font-weight:bold; height:32px; display:inline-flex; align-items:center; background-color:#ffa61a; color:#000; border:none; font-size:15px; cursor:pointer;";
-            btnSeason.innerHTML = `✅ Marcar visíveis`;
-            btnSeason.title = "Marca todos os episódios listados abaixo como 'Já temos'";
-
-            const btnUnmark = document.createElement("button");
-            btnUnmark.className = "focusable btn-icon-left-web text-btnText02";
-            btnUnmark.style.cssText = "padding:0 16px; border-radius:24px; font-weight:bold; height:32px; display:inline-flex; align-items:center; background-color:rgba(255,166,26,0.15); color:#ffa61a; border:1px solid rgba(255,166,26,0.3); font-size:15px; cursor:pointer;";
-            btnUnmark.innerHTML = `❌ Desmarcar visíveis`;
-            btnUnmark.title = "Remove todos os episódios listados abaixo de 'Já temos'";
-
-            btnSeason.addEventListener("click", async (e) => {
-                e.preventDefault(); e.stopPropagation();
-                // Procura os episódios que estão atualmente visíveis no DOM
-                const episodeCards = [...document.querySelectorAll("a[href^='/vod/']")].filter(a => !!a.closest('.grid'));
-                if (episodeCards.length === 0) {
-                    toast("Nenhum episódio localizado nesta vista.");
-                    return;
-                }
-
-                let added = 0;
-                let existing = getStored(STORE_DOWNLOADED);
-                const curCache = buildStoreCache();
-
-                for (const ep of episodeCards) {
-                    const epHref = normUrl(ep.href);
-                    if (!curCache.setDownloaded.has(epHref)) {
-                        const epTitle = safeTrim(ep.getAttribute("alt") || ep.querySelector('.text-cardText01')?.textContent || "Episódio");
-                        const epBg = ep.querySelector('.thumbnail')?.style.backgroundImage || "";
-                        const epMatch = epBg.match(/url\(\s*['"]?(.*?)['"]?\s*\)/);
-                        const epPoster = epMatch ? epMatch[1].replace(/["']/g, '') : "";
-                        existing = mergeData([...existing, { url: epHref, title: epTitle, poster: epPoster, saved_at: Date.now() }]);
-                        added++;
-                    }
-                }
-
-                if (added > 0) {
-                    setStored(STORE_DOWNLOADED, existing);
-                    await saveToCloud();
-                    toast(`✅ ${added} episódios marcados como 'Já temos'!`);
-                    refreshAllCards(); updateStats();
-                } else {
-                    toast("Todos já estavam marcados.");
-                }
-            });
-
-            btnUnmark.addEventListener("click", async (e) => {
-                e.preventDefault(); e.stopPropagation();
-                const episodeCards = [...document.querySelectorAll("a[href^='/vod/']")].filter(a => !!a.closest('.grid'));
-                if (episodeCards.length === 0) {
-                    toast("Nenhum episódio localizado nesta vista.");
-                    return;
-                }
-
-                let removed = 0;
-                let existing = getStored(STORE_DOWNLOADED);
-                const curCache = buildStoreCache();
-                const toRemove = new Set();
-
-                for (const ep of episodeCards) {
-                    const epHref = normUrl(ep.href);
-                    if (curCache.setDownloaded.has(epHref)) {
-                        toRemove.add(epHref);
-                        removed++;
-                    }
-                }
-
-                if (removed > 0) {
-                    setStored(STORE_DOWNLOADED, existing.filter(i => !toRemove.has(i.url)));
-                    await saveToCloud();
-                    toast(`❌ ${removed} episódios removidos de 'Já temos'!`);
-                    refreshAllCards(); updateStats();
-                } else {
-                    toast("Nenhum episódio estava marcado.");
-                }
-            });
-
-            wrapper.appendChild(btnSeason);
-            wrapper.appendChild(btnUnmark);
-
-            if (gridRoot.classList.contains('swiper-tabs')) {
-                gridRoot.parentNode.insertBefore(wrapper, gridRoot.nextSibling);
-            } else {
-                gridRoot.parentNode.insertBefore(wrapper, gridRoot);
-            }
-        }
+        // Injetar os dois botões como <li> dentro da ul.hyperlinks
+        btnContainer.appendChild(createBtn(false)); // Catálogo
+        btnContainer.appendChild(createBtn(true));  // Transferido
     }
 
     function init() {
