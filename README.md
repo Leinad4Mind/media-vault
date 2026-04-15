@@ -16,7 +16,6 @@ Arquitetura: **1 Cloudflare Worker** (backend partilhado) + **1 userscript por s
 | `services/tvcine.user.js` | v1.0.0 |
 | `services/meogo.user.js` | v1.0.0 |
 | `services/zigzag.user.js` | v3.0.0 |
-| `services/simkl-watched.user.js` | v1.0.3 |
 | `worker/worker.js` | v1.1.0 |
 
 ---
@@ -34,7 +33,6 @@ media-vault/
 │   ├── pandaplus.user.js           # Panda+ — catálogo, downloads, cloud sync
 │   ├── tvcine.user.js              # TVCine — catálogo, downloads, cloud sync
 │   ├── zigzag.user.js              # RTP Play Zig Zag — catálogo, cloud sync
-│   └── simkl-watched.user.js       # Todos os sites — overlay "Visto" via API Simkl
 └── README.md
 ```
 
@@ -63,14 +61,6 @@ media-vault/
 | RTP Play | `rtp_` | — em breve |
 | RTP Play Zig Zag | `rtp_` ou `zigzag_` | `services/zigzag.user.js` |
 | TVI Player | `tvi_` | — em breve |
-
-### Script de overlay Simkl (independente, sem Worker)
-
-| Serviço | Suporte |
-|---|---|
-| Filmin.pt | ✓ |
-| FilmTwist.pt | ✓ |
-| Outros (futuro) | adicionar `@match` |
 
 ---
 
@@ -174,48 +164,6 @@ const data = await res.json();
 2. Abre o ficheiro `.user.js` desejado (em `services/`)
 3. Clica **Raw** no GitHub — o Tampermonkey detecta e instala automaticamente
 4. Para scripts de catálogo: abre o site → painel no canto → **Gerir APIs cloud** → URL do Worker + API Key
-5. Para o Simkl: vê a secção abaixo
-
----
-
-## Setup do Simkl Watched Overlay
-
-O script `simkl-watched.user.js` é **independente** — não precisa do Worker. Liga diretamente à API do Simkl e sobrepõe um badge ✓ verde nos cards de filmes/séries já vistos.
-
-### 1. Criar app Simkl
-
-1. Vai a `https://simkl.com/settings/developer/`
-2. Clica **Add** → preenche:
-   - **Name:** qualquer nome (ex: `Simkl Watched Overlay`)
-   - **Redirect URI:** `urn:ietf:wg:oauth:2.0:oob`
-3. Grava → copia o **Client ID**
-
-### 2. Configurar o script
-
-Abre `services/simkl-watched.user.js` e substitui na linha indicada:
-
-```js
-const SIMKL_CLIENT_ID = "COLOCA_AQUI_O_SEU_CLIENT_ID";
-//                       ↑ cola aqui o Client ID da tua app
-```
-
-### 3. Autenticar
-
-1. Abre FilmTwist ou Filmin
-2. Clica no botão **escudo** (canto inferior esquerdo)
-3. Clica **Login** → aparece modal com código PIN
-4. Abre o link, faz login no Simkl, introduz o PIN
-5. O script sincroniza automaticamente e aplica os overlays
-
-### Como funciona o matching
-
-O script associa os títulos da página com a tua lista Simkl por **título + ano**. Para a maioria dos casos funciona automaticamente. Em caso de conflito (mesmo nome, ano diferente, título em língua diferente):
-
-1. Passa o rato sobre o card → aparece botão ✏
-2. Clica → modal de pesquisa → procura no Simkl → **Selecionar**
-3. O override é guardado localmente e tem sempre prioridade sobre o matching automático
-
-A cache Simkl renova-se automaticamente a cada **6 horas**.
 
 ---
 
@@ -227,8 +175,6 @@ O processo é:
 1. Fork deste repo (ou usa como template)
 2. Segue o setup acima com a tua conta Cloudflare
 3. Configura o URL + chave no script via **Gerir APIs cloud**
-
-Para o Simkl, cada utilizador cria a sua própria app em `simkl.com/settings/developer/` — o Client ID é público (não é um segredo).
 
 ---
 

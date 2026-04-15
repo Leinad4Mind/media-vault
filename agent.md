@@ -22,10 +22,7 @@ Exceções validam-se, como os casos em que as plataformas têm diferenças entr
    - Adicionar ou modificar o prefixo no `wrangler.toml` (na flag `ALLOWED_PREFIXES`).
    - Adicionar o modelo de dados em `services/[nome-do-serviço].user.js`, fazendo o request com header `x-api-key`. Evitar cors garantindo origens no Worker se necessário.
 
-3. **Independência Simkl**
-   - O `simkl-watched.user.js` não acede ao Worker nem ao provedor KV. Opera por OAuth perante a plataforma Simkl e processa overlays DOM. Tudo independente!
-
-4. **Tratamento do DOM em Userscripts**
+3. **Tratamento do DOM em Userscripts**
    - Os websites mudam constantemente. Utiliza `MutationObserver` sempre que dependas de conteúdo que é renderizado tardiamente (React / Vue, ex: classes dinamicas).
    - Não uses selectors instáveis ou propensos a falhas rápidas (usa algo o mais genérico e identificativo possível, como IDs e data-attributes, ou em último caso querySelectors com paths concisos).
 
