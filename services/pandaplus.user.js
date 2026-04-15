@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Panda+ — Gestor de Catálogo, Downloads & Sync Cloud
 // @namespace    leinad4mind.top/forum
-// @version      1.8.0
+// @version      1.9.0
 // @description  Conta e guarda filmes/séries do Panda+, sincroniza com Cloudflare Workers (multi-API), gere downloads e copiados, e apresenta uma Dashboard com filtros, posters, notas e exportação. Modifica também os links do header para incluir ?watch_more=1 e adiciona item "Destaques".
 // @author       BlackSpirits & Leinad4Mind
 // @license      MIT
@@ -88,6 +88,14 @@
  *           • Adicionado processamento de links "/vod/" (Episódios): agora os swipers
  *             de episódios do índice e página inicial também integram Cloudflare,
  *             hover overlay, badges e tracking do dashboard
+ *
+ * v1.9.0 (2026-04-15) — Gestão melhorada nas Páginas de Detalhes
+ *           • Botões "Marcar visíveis" e "Desmarcar visíveis" injetados nas
+ *             listagens de episódios/temporadas para gestão em massa rápida
+ *           • Lógica de cores/status invertida nos botões "Já temos":
+ *             - Não guardado: Ícone e fundo Vermelhos ("❌ Marcar Transferido")
+ *             - Guardado: Ícone e fundo Verdes ("✅ Retirar Transferido")
+ *           • Funcionalidade em grelhas (.filters-content) e tabs (.swiper-tabs)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -265,10 +273,10 @@
         .ft-ovl-btn.catalog:hover { background:rgba(14,165,233,1); }
         .ft-ovl-btn.catalog.active { background:rgba(16,185,129,.85); color:#fff; }
         .ft-ovl-btn.catalog.active:hover { background:rgba(16,185,129,1); }
-        .ft-ovl-btn.downloaded { background:rgba(16,185,129,.85); color:#fff; }
-        .ft-ovl-btn.downloaded:hover { background:rgba(16,185,129,1); }
-        .ft-ovl-btn.downloaded.active { background:rgba(239,68,68,.85); color:#fff; }
-        .ft-ovl-btn.downloaded.active:hover { background:rgba(239,68,68,1); }
+        .ft-ovl-btn.downloaded { background:rgba(239,68,68,.85); color:#fff; }
+        .ft-ovl-btn.downloaded:hover { background:rgba(239,68,68,1); }
+        .ft-ovl-btn.downloaded.active { background:rgba(16,185,129,.85); color:#fff; }
+        .ft-ovl-btn.downloaded.active:hover { background:rgba(16,185,129,1); }
 
         /* ---- Painel hide buttons ---- */
         .ft-hide-btn { padding:6px 12px; border-radius:4px; border:1px solid rgba(255,255,255,0.18);
@@ -998,8 +1006,8 @@
         // Botão: Marcar como Já temos
         const btnDwn = document.createElement("button");
         btnDwn.className = "ft-ovl-btn downloaded" + (isDownloaded ? " active" : "");
-        btnDwn.title = isDownloaded ? "Remover de 'Já temos'" : "Marcar como Já temos";
-        btnDwn.innerHTML = isDownloaded ? "❌ Não temos" : "✅ Já temos";
+        btnDwn.title = isDownloaded ? "Remover Transferidos" : "Marcar Transferidos";
+        btnDwn.innerHTML = isDownloaded ? "✅ Remover Transferidos" : "❌ Marcar Transferidos";
         btnDwn.addEventListener("click", async (e) => {
             e.preventDefault(); e.stopPropagation();
             const title = safeTrim(root.getAttribute("alt") || "");
@@ -2518,29 +2526,37 @@
 
         const createBtn = (isMb, isDwn) => {
             const btn = document.createElement("button");
-            // Usamos background transparente (bg-btn02 original da app panda+) com os nossos overrides inline
             btn.className = `focusable ft-detail-buttons-injected ${isMb ? 'btn-icon-web' : 'btn-icon-left-web'}`;
-            btn.style.cssText = isMb 
-                ? "margin-left:8px; padding:0 12px; border-radius:24px; font-weight:bold; height:40px; display:inline-flex; align-items:center; color:#fff; font-size:12px; border:1px solid rgba(255,255,255,0.2); background:transparent;"
-                : "margin-left:12px; padding:0 24px; border-radius:24px; font-weight:bold; height:48px; display:inline-flex; align-items:center; color:#fff; border:1px solid rgba(255,255,255,0.2); background:transparent;";
-            
+            btn.style.cssText = isMb
+                ? "margin-left:8px; padding:0 12px; border-radius:24px; font-weight:bold; height:40px; display:inline-flex; align-items:center; font-size:12px; transition:all 0.2s;"
+                : "margin-left:12px; padding:0 24px; border-radius:24px; font-weight:bold; height:48px; display:inline-flex; align-items:center; transition:all 0.2s;";
+
             if (isDwn) { // Downloaded
                 if (isDownloaded) {
-                    btn.innerHTML = isMb ? `❌ <span style="margin-left:4px">Não temos</span>` : `❌ <span style="margin-left:8px">Não temos</span>`;
-                    btn.style.border = "1px solid rgba(255,166,26,0.6)"; 
-                    btn.style.background = "rgba(255,166,26,0.15)";
+                    btn.innerHTML = isMb ? `✅ <span style="margin-left:4px">Retirar</span>` : `✅ <span style="margin-left:8px">Retirar Transferido</span>`;
+                    btn.style.backgroundColor = "#10b981"; // Green
+                    btn.style.color = "#fff";
+                    btn.style.border = "none";
                 } else {
-                    btn.innerHTML = isMb ? `✅ <span style="margin-left:4px">Temos</span>` : `✅ <span style="margin-left:8px">Já temos</span>`;
+                    btn.innerHTML = isMb ? `❌ <span style="margin-left:4px">Marcar</span>` : `❌ <span style="margin-left:8px">Marcar Transferido</span>`;
+                    btn.style.backgroundColor = "#ef4444"; // Red
+                    btn.style.color = "#fff";
+                    btn.style.border = "none";
                 }
             } else { // Catalog
                 if (isCatalog) {
-                    btn.innerHTML = isMb ? `✓ <span style="margin-left:4px">Retirar</span>` : `✓ <span style="margin-left:8px">Catálogo</span>`;
-                    btn.style.border = "1px solid rgba(255,255,255,0.4)";
+                    btn.innerHTML = isMb ? `✓ <span style="margin-left:4px">Retirar</span>` : `✓ <span style="margin-left:8px">Retirar (Catálogo)</span>`;
+                    btn.style.backgroundColor = "#e5e7eb";
+                    btn.style.color = "#4b5563";
+                    btn.style.border = "1px solid #d1d5db";
                 } else {
                     btn.innerHTML = isMb ? `💾 <span style="margin-left:4px">Catálogo</span>` : `💾 <span style="margin-left:8px">Catálogo</span>`;
+                    btn.style.backgroundColor = "#3b82f6";
+                    btn.style.color = "#fff";
+                    btn.style.border = "none";
                 }
             }
-            
+
             btn.addEventListener("click", async (e) => {
                 e.preventDefault(); e.stopPropagation();
                 if (isDwn) {
@@ -2565,7 +2581,7 @@
                     }
                 }
                 await saveToCloud();
-                
+
                 // Forçar renderização de novos botões em vez de update simples
                 document.querySelectorAll('.ft-detail-buttons-injected').forEach(b => b.remove());
                 injectDetailPageButtons();
@@ -2581,6 +2597,114 @@
         if (mobileContainer && !mobileContainer.querySelector('.ft-detail-buttons-injected')) {
             mobileContainer.appendChild(createBtn(true, false));
             mobileContainer.appendChild(createBtn(true, true));
+        }
+
+        // ---- INJETAR MARCAR VISÍVEIS (Temporada/Área) ----
+        // O selector procura pelo swiper-tabs (Temporadas) ou diretamente a grelha de episódios caso o filme/série nao tenha separador
+        let gridRoot = document.querySelector('.swiper-tabs');
+        if (!gridRoot) {
+            const epGrids = document.querySelectorAll('.filters-content.grid');
+            if (epGrids.length > 0) gridRoot = epGrids[0]; // fallback
+        }
+
+        if (gridRoot && !document.querySelector('.ft-mark-season-btn')) {
+            const wrapper = document.createElement("div");
+            wrapper.className = "ft-mark-season-btn"; // classe de tracking
+            wrapper.style.display = "flex";
+            wrapper.style.gap = "8px";
+            wrapper.style.margin = "8px 0";
+
+            if (gridRoot.classList.contains('swiper-tabs')) {
+                wrapper.style.justifyContent = "flex-end";
+                wrapper.style.width = "100%";
+            }
+
+            const btnSeason = document.createElement("button");
+            btnSeason.className = "focusable btn-icon-left-web text-btnText02";
+            btnSeason.style.cssText = "padding:0 16px; border-radius:24px; font-weight:bold; height:32px; display:inline-flex; align-items:center; background-color:#ffa61a; color:#000; border:none; font-size:12px; cursor:pointer;";
+            btnSeason.innerHTML = `✅ Marcar visíveis`;
+            btnSeason.title = "Marca todos os episódios listados abaixo como 'Já temos'";
+
+            const btnUnmark = document.createElement("button");
+            btnUnmark.className = "focusable btn-icon-left-web text-btnText02";
+            btnUnmark.style.cssText = "padding:0 16px; border-radius:24px; font-weight:bold; height:32px; display:inline-flex; align-items:center; background-color:rgba(255,166,26,0.15); color:#ffa61a; border:1px solid rgba(255,166,26,0.3); font-size:12px; cursor:pointer;";
+            btnUnmark.innerHTML = `❌ Desmarcar visíveis`;
+            btnUnmark.title = "Remove todos os episódios listados abaixo de 'Já temos'";
+
+            btnSeason.addEventListener("click", async (e) => {
+                e.preventDefault(); e.stopPropagation();
+                // Procura os episódios que estão atualmente visíveis no DOM
+                const episodeCards = [...document.querySelectorAll("a[href^='/vod/']")].filter(a => !!a.closest('.grid'));
+                if (episodeCards.length === 0) {
+                    toast("Nenhum episódio localizado nesta vista.");
+                    return;
+                }
+
+                let added = 0;
+                let existing = getStored(STORE_DOWNLOADED);
+                const curCache = buildStoreCache();
+
+                for (const ep of episodeCards) {
+                    const epHref = normUrl(ep.href);
+                    if (!curCache.setDownloaded.has(epHref)) {
+                        const epTitle = safeTrim(ep.getAttribute("alt") || ep.querySelector('.text-cardText01')?.textContent || "Episódio");
+                        const epBg = ep.querySelector('.thumbnail')?.style.backgroundImage || "";
+                        const epMatch = epBg.match(/url\(\s*['"]?(.*?)['"]?\s*\)/);
+                        const epPoster = epMatch ? epMatch[1].replace(/["']/g, '') : "";
+                        existing = mergeData([...existing, { url: epHref, title: epTitle, poster: epPoster, saved_at: Date.now() }]);
+                        added++;
+                    }
+                }
+
+                if (added > 0) {
+                    setStored(STORE_DOWNLOADED, existing);
+                    await saveToCloud();
+                    toast(`✅ ${added} episódios marcados como 'Já temos'!`);
+                    refreshAllCards(); updateStats();
+                } else {
+                    toast("Todos já estavam marcados.");
+                }
+            });
+
+            btnUnmark.addEventListener("click", async (e) => {
+                e.preventDefault(); e.stopPropagation();
+                const episodeCards = [...document.querySelectorAll("a[href^='/vod/']")].filter(a => !!a.closest('.grid'));
+                if (episodeCards.length === 0) {
+                    toast("Nenhum episódio localizado nesta vista.");
+                    return;
+                }
+
+                let removed = 0;
+                let existing = getStored(STORE_DOWNLOADED);
+                const curCache = buildStoreCache();
+                const toRemove = new Set();
+
+                for (const ep of episodeCards) {
+                    const epHref = normUrl(ep.href);
+                    if (curCache.setDownloaded.has(epHref)) {
+                        toRemove.add(epHref);
+                        removed++;
+                    }
+                }
+
+                if (removed > 0) {
+                    setStored(STORE_DOWNLOADED, existing.filter(i => !toRemove.has(i.url)));
+                    await saveToCloud();
+                    toast(`❌ ${removed} episódios removidos de 'Já temos'!`);
+                    refreshAllCards(); updateStats();
+                } else {
+                    toast("Nenhum episódio estava marcado.");
+                }
+            });
+
+            wrapper.appendChild(btnSeason);
+            wrapper.appendChild(btnUnmark);
+
+            if (gridRoot.classList.contains('swiper-tabs')) {
+                gridRoot.parentNode.insertBefore(wrapper, gridRoot.nextSibling);
+            } else {
+                gridRoot.parentNode.insertBefore(wrapper, gridRoot);
+            }
         }
     }
 
