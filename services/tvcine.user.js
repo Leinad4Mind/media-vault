@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TVCine — Gestor de Catálogo, Downloads & Sync Cloud
 // @namespace    leinad4mind.top/forum
-// @version      1.9.0
+// @version      2.0.0
 // @description  Conta e guarda filmes/séries do TVCine, sincroniza com Cloudflare Workers (multi-API), gere downloads e copiados, e apresenta uma Dashboard com filtros, posters, notas e exportação. Modifica também os links do header para incluir ?watch_more=1 e adiciona item "Destaques".
 // @author       Leinad4Mind
 // @license      MIT
@@ -26,8 +26,8 @@
  *           • Título: atributo alt= no elemento <a>
  *           • Header Nuxt: injectHeaderModifications() adiciona ?watch_more=1
  *             a todos os links /filters/ e injeta o item "Destaques"
- *           • Prefixo KV: panda_
- *           • Migração automática de chaves legadas ft_ para panda_
+ *           • Prefixo KV: tvcine_
+ *           • Migração automática de chaves legadas ft_ para tvcine_
  *
  * v1.1.0 (2026-04-14) — Header ?watch_more=1 + item Destaques
  *           • Todos os links do header (/filters/*) recebem ?watch_more=1
@@ -49,16 +49,16 @@
  *           • SVG estrela com fill="white" explícito (não herda currentColor)
  *           • Estrela inserida antes de .texts (aparece por cima do label)
  *           • flex-direction:column no .menu-icon para empilhar ícone+texto
- *           • Classe bg-brandInicio substituída por bg-brandPanda (amarelo)
+ *           • Classe bg-brandInicio substituída por bg-brandTVCine (amarelo)
  *           • Mesmo tratamento aplicado ao .menu-icon-wrapper na sidebar mobile
  *
  * v1.4.0 (2026-04-14) — Cor da marca + título do painel flutuante
  *           • Cor de destaque alterada de vermelho (#dc2626) para laranja
- *             Panda (#ffa61a) em todo o painel flutuante:
+ *             TVCine (#94a3b8) em todo o painel flutuante:
  *             gradient do header, ponto de estado, toast border, box-shadow,
  *             stats de catálogo, border-left dos botões de ação
- *           • Título do painel flutuante corrigido: PANDA_PLUS → PANDA+
- *           • Botão "Gerir APIs cloud" muda de roxo para laranja (#ffa61a)
+ *           • Título do painel flutuante corrigido: tvcine_PLUS → TVCINE
+ *           • Botão "Gerir APIs cloud" muda de roxo para laranja (#94a3b8)
  *
  * v1.5.0 (2026-04-15) — Hover nos cards da homepage
  *           • applyCardState() marca cada <a> processado com data-ft-card="1"
@@ -69,15 +69,15 @@
  *           • Overlay e badges visíveis na página inicial e carroséis
  *
  * v1.6.0 (2026-04-15) — Dashboard — identidade visual TVCine
- *           • Título do dashboard: PANDA_PLUS → PANDA+
+ *           • Título do dashboard: tvcine_PLUS → TVCINE
  *           • Ponto de estado no header do dashboard: vermelho → laranja
- *             (#ffa61a) com glow a combinar
+ *             (#94a3b8) com glow a combinar
  *           • Focus dos inputs no dashboard: borda laranja em vez de vermelha
- *           • Hover nos títulos dos cards do dashboard: laranja (#ffa61a)
+ *           • Hover nos títulos dos cards do dashboard: laranja (#94a3b8)
  *           • Botão "Gerir APIs cloud" no painel flutuante: roxo → laranja
  *
  * v1.7.0 (2026-04-15) — Modal "APIS CLOUD" — identidade visual TVCine
- *           • Gradient do header da modal: vermelho → laranja (#ffa61a)
+ *           • Gradient do header da modal: vermelho → laranja (#94a3b8)
  *           • Ponto de estado e glow: vermelho → laranja
  *           • Borda exterior da caixa (glow ring): vermelho → laranja
  *           • accent-color das checkboxes: vermelho → laranja
@@ -96,6 +96,13 @@
  *             - Não guardado: Ícone e fundo Vermelhos ("❌ Marcar Transferido")
  *             - Guardado: Ícone e fundo Verdes ("✅ Retirar Transferido")
  *           • Funcionalidade em grelhas (.filters-content) e tabs (.swiper-tabs)
+ *
+ * v2.0.0 (2026-04-15) — Identidade TVCine & Purga do Panda
+ *           • Cores revidadas em toda a interface e painéis: o tom principal da
+ *             plataforma mudou de Laranja Panda para Cinza Metálico (#94a3b8) 
+ *             para condizer com a marca do TVCine
+ *           • Nomenclaturas residuais do Panda+ limpas das labels (ex: títulos 
+ *             de JSON Export, variáveis legacy da Dashboard, etc)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -515,8 +522,8 @@
                 display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);`;
             const box = document.createElement("div");
             box.style.cssText = `background:#0a0e16;padding:28px;border-radius:14px;width:90%;max-width:380px;
-                border:1px solid rgba(255,166,26,.15);text-align:center;font-family:system-ui,sans-serif;
-                box-shadow:0 12px 40px rgba(0,0,0,.8),0 0 0 1px rgba(255,166,26,.05);`;
+                border:1px solid rgba(148,163,184,.15);text-align:center;font-family:system-ui,sans-serif;
+                box-shadow:0 12px 40px rgba(0,0,0,.8),0 0 0 1px rgba(148,163,184,.05);`;
             box.innerHTML = `
                 <div style="font-size:35px;margin-bottom:14px;">⚠️</div>
                 <h2 style="margin:0 0 12px;font-size:19px;color:#f1f5f9;letter-spacing:.02em;">${title}</h2>
@@ -759,7 +766,7 @@
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url; a.download = `panda_backup_${dateStr}.json`; a.click();
+        a.href = url; a.download = `tvcine_backup_${dateStr}.json`; a.click();
         URL.revokeObjectURL(url);
         toast("Backup exportado com sucesso.");
     }
@@ -842,7 +849,7 @@
                         || doc.querySelector("h1")?.textContent?.trim()
                         || doc.querySelector("title")?.textContent?.trim()
                         || "";
-                    title = title.replace(/\s*[|–-]\s*Panda[+\s\S]*/i, '').replace(/\s+/g, ' ').trim();
+                    title = title.replace(/\s*[|–-]\s*TVCine[+\s\S]*/i, '').replace(/\s+/g, ' ').trim();
 
                     // Poster: og:image
                     let poster = doc.querySelector('meta[property="og:image"]')?.getAttribute('content')
@@ -1192,7 +1199,7 @@
         statsEl.innerHTML =
             `<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(255,255,255,.05);border-radius:9px;overflow:hidden;">
                 ${cell(STAT_ICONS.page, '#94a3b8', pg, 'Na página')}
-                ${cell(STAT_ICONS.catalog, '#ffa61a', cat, 'Catálogo')}
+                ${cell(STAT_ICONS.catalog, '#94a3b8', cat, 'Catálogo')}
                 ${cell(STAT_ICONS.download, '#10b981', dwn, 'Transferidos')}
                 ${cell(STAT_ICONS.copy, cpy > 0 ? '#f59e0b' : '#334155', cpy, 'Copiados')}
             </div>`;
@@ -1210,7 +1217,7 @@
         } else {
             b.textContent = label;
         }
-        const accent = opts.accent || "rgba(255,166,26,.6)";
+        const accent = opts.accent || "rgba(148,163,184,.6)";
         const danger = opts.danger || false;
         b.style.cssText = `padding:10px 12px;border-radius:10px;
             background:rgba(255,255,255,.05);
@@ -1222,7 +1229,7 @@
             transition:background .15s,border-color .15s,color .15s;`;
         b.addEventListener("mouseover", () => {
             b.style.background = danger ? "rgba(239,68,68,.1)" : "rgba(255,255,255,.09)";
-            b.style.borderLeftColor = danger ? "#f87171" : "rgba(255,166,26,.9)";
+            b.style.borderLeftColor = danger ? "#f87171" : "rgba(148,163,184,.9)";
         });
         b.addEventListener("mouseout", () => {
             b.style.background = "rgba(255,255,255,.05)";
@@ -1244,7 +1251,7 @@
         panel.style.cssText = `position:fixed;right:${state.pos.right !== undefined ? state.pos.right : 14}px;${topOrBottom}
             z-index:999999;width:${state.min ? 180 : 320}px;border-radius:14px;
             background:rgba(8,12,20,.95);border:1px solid rgba(255,255,255,.09);
-            box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 0 1px rgba(255,166,26,.05);
+            box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 0 1px rgba(148,163,184,.05);
             backdrop-filter:blur(12px);overflow:hidden;
             font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#fff;white-space:pre-line;`;
 
@@ -1252,14 +1259,14 @@
         const header = document.createElement("div");
         header.style.cssText = `display:flex;align-items:center;justify-content:space-between;
             padding:11px 10px 11px 13px;cursor:move;user-select:none;
-            background:linear-gradient(105deg,rgba(255,166,26,.22) 0%,rgba(8,12,20,0) 65%);
+            background:linear-gradient(105deg,rgba(148,163,184,.22) 0%,rgba(8,12,20,0) 65%);
             border-bottom:1px solid rgba(255,255,255,.07);`;
 
         const title = document.createElement("div");
         title.style.cssText = "display:flex;align-items:center;gap:8px;";
         title.innerHTML = `
-            <span style="width:7px;height:7px;border-radius:50%;background:#ffa61a;
-                box-shadow:0 0 8px rgba(255,166,26,.8);flex-shrink:0;display:inline-block;"></span>
+            <span style="width:7px;height:7px;border-radius:50%;background:#94a3b8;
+                box-shadow:0 0 8px rgba(148,163,184,.8);flex-shrink:0;display:inline-block;"></span>
             <span style="font-weight:700;font-size:14.5px;letter-spacing:.14em;color:#f1f5f9;">TVCINE</span>`;
 
         const svgMin = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
@@ -1297,7 +1304,7 @@
         btnMark.style.flex = "1"; btnReset.style.flex = "1";
         rowCopied.append(btnMark, btnReset);
 
-        const btnAPIs = makeButton("Gerir APIs cloud", openApiManagerUI, { accent: "rgba(255,166,26,.7)", icon: "api" });
+        const btnAPIs = makeButton("Gerir APIs cloud", openApiManagerUI, { accent: "rgba(148,163,184,.7)", icon: "api" });
         btnAPIs.style.flex = "1";
 
         const rowBackup = document.createElement("div"); rowBackup.style.cssText = "display:flex;gap:7px;";
@@ -1553,7 +1560,7 @@
         box.style.cssText = `background:#0a0e16;border:1px solid rgba(255,255,255,.09);padding:0;width:680px;max-width:95%;
             border-radius:14px;color:#e2e8f0;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;
             font-family:system-ui,-apple-system,Segoe UI,sans-serif;
-            box-shadow:0 24px 60px rgba(0,0,0,.7),0 0 0 1px rgba(255,166,26,.06);`;
+            box-shadow:0 24px 60px rgba(0,0,0,.7),0 0 0 1px rgba(148,163,184,.06);`;
 
         const iSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 7l3 3-3 3"/><path d="M8 13h8"/><rect x="2" y="3" width="20" height="18" rx="2"/>
@@ -1564,7 +1571,7 @@
         const inputCSS = `width:100%;padding:9px 12px;background:rgba(255,255,255,.04);color:#e2e8f0;
             border:1px solid rgba(255,255,255,.09);border-radius:8px;box-sizing:border-box;
             font-size:15.5px;font-family:inherit;outline:none;transition:border-color .15s;`;
-        const checkCSS = `accent-color:#ffa61a;width:14px;height:14px;cursor:pointer;`;
+        const checkCSS = `accent-color:#94a3b8;width:14px;height:14px;cursor:pointer;`;
 
         const renderList = () => {
             const configs = getApiConfigs();
@@ -1610,9 +1617,9 @@
 
             box.innerHTML = `
             <!-- Header -->
-            <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(105deg,rgba(255,166,26,.1),rgba(8,12,20,0));">
+            <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(105deg,rgba(148,163,184,.1),rgba(8,12,20,0));">
                 <div style="display:flex;align-items:center;gap:10px;">
-                    <span style="width:7px;height:7px;border-radius:50%;background:#ffa61a;box-shadow:0 0 8px rgba(255,166,26,.8);display:inline-block;"></span>
+                    <span style="width:7px;height:7px;border-radius:50%;background:#94a3b8;box-shadow:0 0 8px rgba(148,163,184,.8);display:inline-block;"></span>
                     <span style="font-size:15.5px;font-weight:700;letter-spacing:.12em;color:#f1f5f9;">APIS CLOUD</span>
                 </div>
                 <button type="button" id="ft-tut-btn" style="padding:6px 12px;background:rgba(139,92,246,.2);color:#c4b5fd;border:1px solid rgba(139,92,246,.3);border-radius:7px;font-size:14px;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:5px;">
@@ -1855,7 +1862,7 @@
                 color:#e2e8f0 !important; padding:9px 13px !important; border-radius:8px !important;
                 outline:none; transition:border-color .15s; font-size:16px;
                 color-scheme:dark; }
-            .ft-input:focus { border-color:rgba(255,166,26,.5) !important; }
+            .ft-input:focus { border-color:rgba(148,163,184,.5) !important; }
             .ft-input option { background:#0f172a !important; color:#e2e8f0 !important; }
             .ft-btn { border:none;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:600;font-size:15.5px;
                 transition:opacity .15s,transform .1s; }
@@ -1878,8 +1885,8 @@
   <!-- Header -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;padding-bottom:18px;border-bottom:1px solid rgba(255,255,255,.08);">
     <div style="display:flex;align-items:center;gap:12px;">
-      <span style="width:9px;height:9px;border-radius:50%;background:#ffa61a;box-shadow:0 0 10px rgba(255,166,26,.9);display:inline-block;"></span>
-      <span style="font-size:18px;font-weight:700;letter-spacing:.12em;color:#f1f5f9;">PANDA+</span>
+      <span style="width:9px;height:9px;border-radius:50%;background:#94a3b8;box-shadow:0 0 10px rgba(148,163,184,.9);display:inline-block;"></span>
+      <span style="font-size:18px;font-weight:700;letter-spacing:.12em;color:#f1f5f9;">TVCINE</span>
       <span style="font-size:14px;color:#94a3b8;letter-spacing:.06em;font-weight:500;">DASHBOARD</span>
     </div>
     <button @click="close" class="ft-btn" style="background:rgba(220,38,38,.15);color:#f87171;border:1px solid rgba(220,38,38,.3);">Fechar</button>
@@ -1974,7 +1981,7 @@
       <div style="padding:10px 12px;display:flex;flex-direction:column;flex-grow:1;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:4px;">
           <a :href="item.url" target="_blank" style="flex-grow:1;color:#e2e8f0;text-decoration:none;font-weight:600;font-size:15.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4;"
-           @mouseenter="$event.target.style.color='#ffa61a'" @mouseleave="$event.target.style.color='#e2e8f0'">{{ item.title||'Sem Título' }}</a>
+           @mouseenter="$event.target.style.color='#94a3b8'" @mouseleave="$event.target.style.color='#e2e8f0'">{{ item.title||'Sem Título' }}</a>
           <div v-if="hasWriteAccess(item)" style="display:flex;gap:2px;flex-shrink:0;">
             <button @click.prevent="openEditModal(item)" style="background:transparent;color:#475569;border:none;border-radius:4px;padding:3px;cursor:pointer;font-size:15px;transition:color .15s;" @mouseenter="$event.target.style.color='#e2e8f0'" @mouseleave="$event.target.style.color='#475569'" title="Editar">✏️</button>
             <button @click.prevent="deleteItem(item)"   style="background:transparent;color:#475569;border:none;border-radius:4px;padding:3px;cursor:pointer;font-size:15px;transition:color .15s;" @mouseenter="$event.target.style.color='#ef4444'" @mouseleave="$event.target.style.color='#475569'" title="Eliminar">🗑️</button>
@@ -2026,7 +2033,7 @@
                 const filterCloud = ref("all");
                 const dateStart = ref("");
                 const dateEnd = ref("");
-                const viewMode = ref(safeLSGet("panda_dash_view_mode", "card") || "card");
+                const viewMode = ref(safeLSGet("tvcine_dash_view_mode", "card") || "card");
                 const imageCache = ref({});
                 const editingItem = ref(null);
                 const editingNoteItem = ref(null);
@@ -2079,7 +2086,7 @@
                     obs.observe(sentinel.value);
                 });
 
-                const toggleView = () => { viewMode.value = viewMode.value === 'card' ? 'poster' : 'card'; safeLSSet("panda_dash_view_mode", viewMode.value); };
+                const toggleView = () => { viewMode.value = viewMode.value === 'card' ? 'poster' : 'card'; safeLSSet("tvcine_dash_view_mode", viewMode.value); };
                 const close = () => { delete window._ftDashUpdateItem; delete window._ftDashScrapeProgress; revokeAllObjectURLs(); mod.remove(); };
                 const isSaved = (item) => item.isLocalDownloaded || Object.keys(item.cloudDownloaded).length > 0;
                 const badgeIcon = (item, n) => { let i = ''; if (item.cloudDownloaded[n]) i += ICONS.download; if (item.cloudHistory[n]) i += ICONS.history; return i || ICONS.cloud; };
@@ -2240,7 +2247,7 @@
             <div style="background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:12px 15px;margin-bottom:18px;">
                 <div style="font-size:13.5px;color:#64748b;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;">⚙ Variáveis de ambiente opcionais (Settings → Variables)</div>
                 <div style="display:flex;flex-direction:column;gap:5px;font-size:15px;">
-                    <div><span style="${codeStyle}">ALLOWED_PREFIXES</span> <span style="color:#64748b;">— prefixos permitidos (default já inclui</span> <span style="${codeStyle}">panda_</span><span style="color:#64748b;">)</span></div>
+                    <div><span style="${codeStyle}">ALLOWED_PREFIXES</span> <span style="color:#64748b;">— prefixos permitidos (default já inclui</span> <span style="${codeStyle}">tvcine_</span><span style="color:#64748b;">)</span></div>
                     <div><span style="${codeStyle}">READ_KEY</span> <span style="color:#64748b;">— chave separada para leitura (opcional)</span></div>
                     <div><span style="${codeStyle}">ALLOWED_ORIGIN</span><span style="color:#475569;">,</span> <span style="${codeStyle}">MAX_BODY</span><span style="color:#475569;">,</span> <span style="${codeStyle}">MAX_ITEMS</span></div>
                 </div>
@@ -2253,7 +2260,7 @@
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
                 ${btnCopy("ft-tut-copy-secret", "Copiar nome do Secret (API_KEY)", "rgba(139,92,246,.15)", "rgba(139,92,246,.35)", "#c4b5fd")}
                 ${btnCopy("ft-tut-copy-kv", "Copiar KV binding (MEDIA)", "rgba(16,185,129,.15)", "rgba(16,185,129,.35)", "#6ee7b7")}
-                ${btnCopy("ft-tut-copy-pfx", "Copiar prefixo (panda_)", "rgba(14,165,233,.15)", "rgba(14,165,233,.35)", "#7dd3fc")}
+                ${btnCopy("ft-tut-copy-pfx", "Copiar prefixo (tvcine_)", "rgba(14,165,233,.15)", "rgba(14,165,233,.35)", "#7dd3fc")}
             </div>
         </div>`;
 
@@ -2265,7 +2272,7 @@
         mod.addEventListener("click", (e) => { if (e.target === mod) close(); });
         box.querySelector("#ft-tut-copy-secret").onclick = () => { GM_setClipboard("API_KEY", { type: "text/plain" }); toast("Copiado: API_KEY"); };
         box.querySelector("#ft-tut-copy-kv").onclick = () => { GM_setClipboard("MEDIA", { type: "text/plain" }); toast("Copiado: MEDIA"); };
-        box.querySelector("#ft-tut-copy-pfx").onclick = () => { GM_setClipboard("panda_", { type: "text/plain" }); toast("Copiado: panda_"); };
+        box.querySelector("#ft-tut-copy-pfx").onclick = () => { GM_setClipboard("tvcine_", { type: "text/plain" }); toast("Copiado: tvcine_"); };
     }
 
     /* =====================================================================
@@ -2319,7 +2326,7 @@
     GM_registerMenuCommand("Scroll automático (ON/OFF)", () => toggleAutoScroll(null));
 
     /* =====================================================================
-       MIGRAÇÃO DE DADOS LEGACY (ft_* → panda_*)
+       MIGRAÇÃO DE DADOS LEGACY (ft_* → tvcine_*)
        ===================================================================== */
 
     function migrateLegacyKeys() {
@@ -2364,7 +2371,7 @@
             const nv = GM_getValue(nk, null);
             if (ov !== null && nv === null) { GM_setValue(nk, ov); GM_setValue(ok, null); }
         });
-        if (migrated > 0) console.log(`[TVCine] ${migrated} chave(s) migradas de ft_* para panda_*.`);
+        if (migrated > 0) console.log(`[TVCine] ${migrated} chave(s) migradas de ft_* para tvcine_*.`);
     }
 
     /* =====================================================================
@@ -2436,7 +2443,7 @@
     }
 
     /* =====================================================================
-       PANDA+ HEADER MENU MODS (?watch_more=1 & Destaques)
+       TVCINE HEADER MENU MODS (?watch_more=1 & Destaques)
        ===================================================================== */
 
     function injectHeaderModifications() {
@@ -2503,7 +2510,7 @@
                     menuIconBox.classList.forEach(cls => {
                         if (cls.startsWith('bg-brand')) menuIconBox.classList.remove(cls);
                     });
-                    menuIconBox.classList.add('bg-brandPanda');
+                    menuIconBox.classList.add('bg-brandTVCine');
                     // Ocultar imagem herdada
                     const iconImg = menuIconBox.querySelector('img');
                     if (iconImg) iconImg.style.display = 'none';
@@ -2559,7 +2566,7 @@
                         mobileIconEl.classList.forEach(cls => {
                             if (cls.startsWith('bg-brand')) mobileIconEl.classList.remove(cls);
                         });
-                        mobileIconEl.classList.add('bg-brandPanda');
+                        mobileIconEl.classList.add('bg-brandTVCine');
                     }
                     mobileIconBox.style.cssText += ';display:inline-flex;flex-direction:column;align-items:center;justify-content:center;';
                     const starSvgMb = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -2582,7 +2589,7 @@
     }
 
     /* =====================================================================
-       PANDA+ DETAIL PAGE BUTTONS ("JÁ TEMOS" / "GUARDAR")
+       TVCINE DETAIL PAGE BUTTONS ("JÁ TEMOS" / "GUARDAR")
        ===================================================================== */
 
     function injectDetailPageButtons() {
@@ -2701,13 +2708,13 @@
 
             const btnSeason = document.createElement("button");
             btnSeason.className = "focusable btn-icon-left-web text-btnText02";
-            btnSeason.style.cssText = "padding:0 16px; border-radius:24px; font-weight:bold; height:32px; display:inline-flex; align-items:center; background-color:#ffa61a; color:#000; border:none; font-size:15px; cursor:pointer;";
+            btnSeason.style.cssText = "padding:0 16px; border-radius:24px; font-weight:bold; height:32px; display:inline-flex; align-items:center; background-color:#94a3b8; color:#000; border:none; font-size:15px; cursor:pointer;";
             btnSeason.innerHTML = `✅ Marcar visíveis`;
             btnSeason.title = "Marca todos os episódios listados abaixo como 'Já temos'";
 
             const btnUnmark = document.createElement("button");
             btnUnmark.className = "focusable btn-icon-left-web text-btnText02";
-            btnUnmark.style.cssText = "padding:0 16px; border-radius:24px; font-weight:bold; height:32px; display:inline-flex; align-items:center; background-color:rgba(255,166,26,0.15); color:#ffa61a; border:1px solid rgba(255,166,26,0.3); font-size:15px; cursor:pointer;";
+            btnUnmark.style.cssText = "padding:0 16px; border-radius:24px; font-weight:bold; height:32px; display:inline-flex; align-items:center; background-color:rgba(148,163,184,0.15); color:#94a3b8; border:1px solid rgba(148,163,184,0.3); font-size:15px; cursor:pointer;";
             btnUnmark.innerHTML = `❌ Desmarcar visíveis`;
             btnUnmark.title = "Remove todos os episódios listados abaixo de 'Já temos'";
 
