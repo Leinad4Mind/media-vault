@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MEO Go — Gestor de Catálogo, Downloads & Sync Cloud
 // @namespace    leinad4mind.top/forum
-// @version      2.3.1
+// @version      2.4.2
 // @description  Conta e guarda filmes/séries do MEO Go, sincroniza com Cloudflare Workers (multi-API), gere downloads e copiados, e apresenta uma Dashboard com filtros, posters, notas e exportação. Modifica também os links do header para incluir ?watch_more=1 e adiciona item "Destaques".
 // @author       Leinad4Mind
 // @license      MIT
@@ -14,6 +14,9 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
+// @require      https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js
+// @connect      cdn.jsdelivr.net
+// @connect      unpkg.com
 // ==/UserScript==
 
 /*
@@ -147,6 +150,30 @@
  *           • Estratégia 2: GM_xmlhttpRequest + Blob URL (CSP de rede ignorada;
  *             o blob corre no contexto real da página com os Symbol/Proxy
  *             corretos → Vue renderiza normalmente)
+ * v2.4.0 (2026-04-15) — Fix definitivo: @require para Vue (CSP-exempt)
+ *           • O MEO Go bloqueia tudo via CSP: URLs externas, blob: e eval
+ *           • @require faz o Tampermonkey pré-carregar o Vue como content-script
+ *             (extensão de browser), que é CSP-exempt por definição — o Vue
+ *             fica disponível como global 'Vue' no scope do userscript antes
+ *             de qualquer código da página correr
+ *           • Versão fixada: vue@3.5.13 para evitar breaking changes
+ *           • _loadVue() verifica primeiro typeof Vue (do @require), depois
+ *             unsafeWindow.Vue, depois fallbacks CDN e blob: para edge cases
+ * v2.4.1 (2026-04-15) — Fix: ReferenceError Vue (nested-eval sandbox)
+ *           • No modo sandbox do Tampermonkey (com @grant), o @require coloca
+ *             Vue em globalThis.Vue mas em nested-eval o identificador nu 'Vue'
+ *             lança ReferenceError mesmo com typeof (semântica diferente do eval
+ *             interno do Tampermonkey)
+ *           • Removido qualquer acesso ao identificador nu Vue; agora usa
+ *             sempre globalThis?.Vue, self?.Vue, window?.Vue, unsafeWindow?.Vue
+ *             com try/catch em cada um para totais segurança
+ * v2.4.2 (2026-04-15) — Fix: CSP blocks & appendChild null error
+ *           • Corrige erro em contexts onde document.head ainda é null
+ *           • O CSP do MEO Go bloqueia domínios externos e `blob:` no script-src,
+ *             mas permite explicitamente `'unsafe-inline'`.
+ *           • A estratégia principal de fallback agora usa GM_xmlhttpRequest
+ *             para buscar o código e injeta-o como texto (`s.textContent = code`),
+ *             o que é interpretado como inline script e ignorado pelo CSP!
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -803,7 +830,7 @@
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url; a.download = `panda_backup_${dateStr}.json`; a.click();
+        a.href = url; a.download = `meogo_backup_${dateStr}.json`; a.click();
         URL.revokeObjectURL(url);
         toast("Backup exportado com sucesso.");
     }
@@ -886,7 +913,7 @@
                         || doc.querySelector("h1")?.textContent?.trim()
                         || doc.querySelector("title")?.textContent?.trim()
                         || "";
-                    title = title.replace(/\s*[|–-]\s*Panda[+\s\S]*/i, '').replace(/\s+/g, ' ').trim();
+                    title = title.replace(/\s*[|–-]\s*MEO Go[+\s\S]*/i, '').replace(/\s*[|–-]\s*MEO[+\s\S]*/i, '').replace(/\s+/g, ' ').trim();
 
                     // Poster: og:image
                     let poster = doc.querySelector('meta[property="og:image"]')?.getAttribute('content')
@@ -1813,28 +1840,25 @@
 
     async function _loadVue() {
         if (_vueLib) return _vueLib;
-        if (unsafeWindow.Vue) { _vueLib = unsafeWindow.Vue; return _vueLib; }
+
+        // Prioridade 1: @require injetou Vue (o UMD do Vue faz globalThis.Vue = exports)
+        // NUNCA aceder ao identificador nu 'Vue' — em Tampermonkey nested-eval
+        // isso lança ReferenceError mesmo com typeof. Usar sempre caminho explícito.
+        let _vReq = null;
+        try { _vReq = globalThis?.Vue; } catch { }
+        if (!_vReq?.createApp) try { _vReq = self?.Vue; } catch { }
+        if (!_vReq?.createApp) try { _vReq = window?.Vue; } catch { }
+        if (!_vReq?.createApp) try { _vReq = unsafeWindow?.Vue; } catch { }
+        if (_vReq?.createApp) { _vueLib = _vReq; return _vueLib; }
 
         const CDNS = [
+            'https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js',
             'https://unpkg.com/vue@3/dist/vue.global.prod.js',
-            'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js',
         ];
 
-        // Estratégia 1: <script src> direto (funciona sem CSP restrita, contexto da página)
-        for (const url of CDNS) {
-            try {
-                await new Promise((res, rej) => {
-                    const s = document.createElement('script');
-                    s.src = url; s.crossOrigin = 'anonymous';
-                    s.onload = res; s.onerror = rej;
-                    document.head.appendChild(s);
-                });
-                if (unsafeWindow.Vue?.createApp) { _vueLib = unsafeWindow.Vue; return _vueLib; }
-            } catch { /* CSP bloqueou, tentar próxima estratégia */ }
-        }
-
-        // Estratégia 2: GM_xmlhttpRequest + Blob URL (ignora CSP de rede; executa no contexto da página)
-        // O Blob URL corre como script da página → Symbol/Proxy corretos → Vue renderiza corretamente
+        // Prioridade 2: MEO Go CSP permite 'unsafe-inline' mas bloqueia URLs externos/blobs.
+        // Solução: Fetch do código via GM_xmlhttpRequest (ignora CSP de rede) e
+        // injeção como <script> inline textual (passa no CSP da página).
         for (const url of CDNS) {
             try {
                 const code = await new Promise((resolve, reject) => {
@@ -1847,27 +1871,19 @@
                         timeout: 20000,
                     });
                 });
-
-                const lib = await new Promise((resolve, reject) => {
-                    const blob = new Blob([code], { type: 'application/javascript' });
-                    const blobUrl = URL.createObjectURL(blob);
-                    const s = document.createElement('script');
-                    s.src = blobUrl;
-                    s.onload = () => {
-                        URL.revokeObjectURL(blobUrl);
-                        resolve(unsafeWindow.Vue);
-                    };
-                    s.onerror = () => {
-                        URL.revokeObjectURL(blobUrl);
-                        reject(new Error('blob: bloqueado pelo CSP'));
-                    };
-                    document.head.appendChild(s);
-                });
-                if (lib?.createApp) { _vueLib = lib; return _vueLib; }
-            } catch (e) { console.warn('[MEO Go] Vue blob falhou:', url, e.message); }
+                
+                const s = document.createElement('script');
+                s.textContent = code;
+                const target = document.head || document.documentElement || document;
+                target.appendChild(s);
+                
+                if (unsafeWindow.Vue?.createApp) { _vueLib = unsafeWindow.Vue; return _vueLib; }
+            } catch (e) {
+                console.warn('[MEO Go] Vue inline falhou:', url, e.message);
+            }
         }
 
-        throw new Error('Não foi possível carregar Vue (CDN bloqueado pelo CSP do site).');
+        throw new Error('Vue não disponível. Tenta atualizar o script no Tampermonkey para ler o @require recente.');
     }
 
     async function openDashboardUI() {
@@ -2124,7 +2140,7 @@
                 const filterCloud = ref("all");
                 const dateStart = ref("");
                 const dateEnd = ref("");
-                const viewMode = ref(safeLSGet("panda_dash_view_mode", "card") || "card");
+                const viewMode = ref(safeLSGet("meogo_dash_view_mode", "card") || "card");
                 const imageCache = ref({});
                 const editingItem = ref(null);
                 const editingNoteItem = ref(null);
@@ -2177,7 +2193,7 @@
                     obs.observe(sentinel.value);
                 });
 
-                const toggleView = () => { viewMode.value = viewMode.value === 'card' ? 'poster' : 'card'; safeLSSet("panda_dash_view_mode", viewMode.value); };
+                const toggleView = () => { viewMode.value = viewMode.value === 'card' ? 'poster' : 'card'; safeLSSet("meogo_dash_view_mode", viewMode.value); };
                 const close = () => { delete window._ftDashUpdateItem; delete window._ftDashScrapeProgress; revokeAllObjectURLs(); mod.remove(); };
                 const isSaved = (item) => item.isLocalDownloaded || Object.keys(item.cloudDownloaded).length > 0;
                 const badgeIcon = (item, n) => { let i = ''; if (item.cloudDownloaded[n]) i += ICONS.download; if (item.cloudHistory[n]) i += ICONS.history; return i || ICONS.cloud; };
@@ -2338,7 +2354,7 @@
             <div style="background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:12px 15px;margin-bottom:18px;">
                 <div style="font-size:13.5px;color:#64748b;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;">⚙ Variáveis de ambiente opcionais (Settings → Variables)</div>
                 <div style="display:flex;flex-direction:column;gap:5px;font-size:15px;">
-                    <div><span style="${codeStyle}">ALLOWED_PREFIXES</span> <span style="color:#64748b;">— prefixos permitidos (default já inclui</span> <span style="${codeStyle}">panda_</span><span style="color:#64748b;">)</span></div>
+                    <div><span style="${codeStyle}">ALLOWED_PREFIXES</span> <span style="color:#64748b;">— prefixos permitidos (default já inclui</span> <span style="${codeStyle}">meogo_</span><span style="color:#64748b;">)</span></div>
                     <div><span style="${codeStyle}">READ_KEY</span> <span style="color:#64748b;">— chave separada para leitura (opcional)</span></div>
                     <div><span style="${codeStyle}">ALLOWED_ORIGIN</span><span style="color:#475569;">,</span> <span style="${codeStyle}">MAX_BODY</span><span style="color:#475569;">,</span> <span style="${codeStyle}">MAX_ITEMS</span></div>
                 </div>
@@ -2351,7 +2367,7 @@
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
                 ${btnCopy("ft-tut-copy-secret", "Copiar nome do Secret (API_KEY)", "rgba(139,92,246,.15)", "rgba(139,92,246,.35)", "#c4b5fd")}
                 ${btnCopy("ft-tut-copy-kv", "Copiar KV binding (MEDIA)", "rgba(16,185,129,.15)", "rgba(16,185,129,.35)", "#6ee7b7")}
-                ${btnCopy("ft-tut-copy-pfx", "Copiar prefixo (panda_)", "rgba(14,165,233,.15)", "rgba(14,165,233,.35)", "#7dd3fc")}
+                ${btnCopy("ft-tut-copy-pfx", "Copiar prefixo (meogo_)", "rgba(14,165,233,.15)", "rgba(14,165,233,.35)", "#7dd3fc")}
             </div>
         </div>`;
 
@@ -2363,7 +2379,7 @@
         mod.addEventListener("click", (e) => { if (e.target === mod) close(); });
         box.querySelector("#ft-tut-copy-secret").onclick = () => { GM_setClipboard("API_KEY", { type: "text/plain" }); toast("Copiado: API_KEY"); };
         box.querySelector("#ft-tut-copy-kv").onclick = () => { GM_setClipboard("MEDIA", { type: "text/plain" }); toast("Copiado: MEDIA"); };
-        box.querySelector("#ft-tut-copy-pfx").onclick = () => { GM_setClipboard("panda_", { type: "text/plain" }); toast("Copiado: panda_"); };
+        box.querySelector("#ft-tut-copy-pfx").onclick = () => { GM_setClipboard("meogo_", { type: "text/plain" }); toast("Copiado: meogo_"); };
     }
 
     /* =====================================================================
@@ -2417,7 +2433,7 @@
     GM_registerMenuCommand("Scroll automático (ON/OFF)", () => toggleAutoScroll(null));
 
     /* =====================================================================
-       MIGRAÇÃO DE DADOS LEGACY (ft_* → panda_*)
+       MIGRAÇÃO DE DADOS LEGACY (ft_* → meogo_*)
        ===================================================================== */
 
     function migrateLegacyKeys() {
@@ -2462,7 +2478,7 @@
             const nv = GM_getValue(nk, null);
             if (ov !== null && nv === null) { GM_setValue(nk, ov); GM_setValue(ok, null); }
         });
-        if (migrated > 0) console.log(`[MEO Go] ${migrated} chave(s) migradas de ft_* para panda_*.`);
+        if (migrated > 0) console.log(`[MEO Go] ${migrated} chave(s) migradas provisoriamente.`);
     }
 
     /* =====================================================================
@@ -2534,13 +2550,13 @@
     }
 
     /* =====================================================================
-       PANDA+ HEADER MENU MODS (?watch_more=1 & Destaques)
+       MEO GO HEADER MENU MODS (?watch_more=1 & Destaques)
        ===================================================================== */
 
     function injectHeaderModifications() { }
 
     /* =====================================================================
-       PANDA+ DETAIL PAGE BUTTONS ("JÁ TEMOS" / "GUARDAR")
+       MEO GO DETAIL PAGE BUTTONS ("JÁ TEMOS" / "GUARDAR")
        ===================================================================== */
 
     function injectDetailPageButtons() {
