@@ -618,18 +618,18 @@
                 .map(node => node.textContent)
                 .join(" ")
                 .trim() : "";
-                
+
             const spanTitle = titleEl?.querySelector("span");
             if (spanTitle) {
-                 title += " " + spanTitle.textContent.trim();
+                title += " " + spanTitle.textContent.trim();
             }
-            if(!title) {
-                 title = safeTrim(linkEl.getAttribute("alt") || "");
+            if (!title) {
+                title = safeTrim(linkEl.getAttribute("alt") || "");
             }
 
             const imgEl = linkEl.querySelector("img.catalog-cover, img");
             let poster = imgEl ? (imgEl.getAttribute("data-src") || imgEl.getAttribute("src") || "") : "";
-            
+
             // Força a imagem de alta resolução (remove _s antes da extensão)
             if (poster) poster = poster.replace(/_s\.([^.]+)$/i, '.$1');
 
@@ -955,16 +955,16 @@
 
         // Marcar com data-ft-card para o CSS de hover funcionar
         root.setAttribute('data-ft-card', '1');
-        
+
         let imgWrapper = linkEl.querySelector('.ft-img-wrapper');
         const rawImg = linkEl.querySelector("img.catalog-cover, img");
         if (rawImg && !imgWrapper) {
-             imgWrapper = document.createElement("div");
-             imgWrapper.className = "ft-img-wrapper";
-             imgWrapper.style.position = "relative";
-             imgWrapper.style.display = "flex";
-             rawImg.parentNode.insertBefore(imgWrapper, rawImg);
-             imgWrapper.appendChild(rawImg);
+            imgWrapper = document.createElement("div");
+            imgWrapper.className = "ft-img-wrapper";
+            imgWrapper.style.position = "relative";
+            imgWrapper.style.display = "flex";
+            rawImg.parentNode.insertBefore(imgWrapper, rawImg);
+            imgWrapper.appendChild(rawImg);
         }
         const insertTarget = imgWrapper || root;
         insertTarget.style.position = insertTarget.style.position || 'relative';
@@ -1046,17 +1046,17 @@
         btnCat.addEventListener("click", async (e) => {
             e.preventDefault(); e.stopPropagation();
             const existing = getStored(STORE_CATALOG);
-            
+
             const titleEl = root.querySelector(".catalog-cover-p");
             let title = titleEl ? Array.from(titleEl.childNodes).filter(n => n.nodeType === Node.TEXT_NODE).map(n => n.textContent).join(" ").trim() : "";
             const spanTitle = titleEl?.querySelector("span");
-            if(spanTitle) title += " " + spanTitle.textContent.trim();
+            if (spanTitle) title += " " + spanTitle.textContent.trim();
             title = safeTrim(title);
-            
+
             const imgEl = root.querySelector("img.catalog-cover, img");
             let poster = imgEl ? (imgEl.getAttribute("data-src") || imgEl.getAttribute("src") || "") : "";
             if (poster) poster = poster.replace(/_s\.([^.]+)$/i, '.$1');
-            
+
             if (isCatalog) {
                 setStored(STORE_CATALOG, existing.filter(i => i.url !== href));
                 toast("Removido do catálogo.");
@@ -1079,13 +1079,13 @@
             const titleEl = root.querySelector(".catalog-cover-p");
             let title = titleEl ? Array.from(titleEl.childNodes).filter(n => n.nodeType === Node.TEXT_NODE).map(n => n.textContent).join(" ").trim() : "";
             const spanTitle = titleEl?.querySelector("span");
-            if(spanTitle) title += " " + spanTitle.textContent.trim();
+            if (spanTitle) title += " " + spanTitle.textContent.trim();
             title = safeTrim(title);
-            
+
             const imgEl = root.querySelector("img.catalog-cover, img");
             let poster = imgEl ? (imgEl.getAttribute("data-src") || imgEl.getAttribute("src") || "") : "";
             if (poster) poster = poster.replace(/_s\.([^.]+)$/i, '.$1');
-            
+
             if (isDownloaded) {
                 setStored(STORE_DOWNLOADED, getStored(STORE_DOWNLOADED).filter(i => i.url !== href));
                 toast("Removido de 'Já temos'.");
@@ -1394,12 +1394,12 @@
         // Insere após os select filters
         const filterGroup = filterDiv.querySelector(".fliter-group");
         if (filterGroup) {
-             filterGroup.style.display = "flex";
-             filterGroup.style.flexWrap = "wrap";
-             filterGroup.style.alignItems = "center";
-             filterGroup.appendChild(wrapper);
+            filterGroup.style.display = "flex";
+            filterGroup.style.flexWrap = "wrap";
+            filterGroup.style.alignItems = "center";
+            filterGroup.appendChild(wrapper);
         } else {
-             filterDiv.appendChild(wrapper);
+            filterDiv.appendChild(wrapper);
         }
     }
 
@@ -2188,8 +2188,8 @@
     function openWorkerTutorialUI() {
         document.getElementById("ft-cloud-tutorial")?.remove();
 
-        const GITHUB_URL = "https://github.com/Blackspirits/media-sync/blob/main/worker/worker.js";
-        const GITHUB_REPO_URL = "https://github.com/Blackspirits/media-sync";
+        const GITHUB_URL = "https://github.com/Leinad4Mind/media-vault/blob/main/worker/worker.js";
+        const GITHUB_REPO_URL = "https://github.com/Leinad4Mind/media-vault";
 
         const mod = document.createElement("div");
         mod.id = "ft-cloud-tutorial";

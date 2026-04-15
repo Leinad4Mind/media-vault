@@ -13,4 +13,4 @@ Este workflow orienta a criação de um novo userscript básico para um serviço
 5. Adicionar o novo prefixo KV no topo para lembrança, ou no ficheiro `wrangler.toml` na secção de opções globais `ALLOWED_PREFIXES`.
 
 > [!TIP]
-> Verifica a documentação da _skill_ `Gestão de Userscripts Media-Sync` em caso de dúvida nas convenções.
+> Verifica a documentação da _skill_ `Gestão de Userscripts Media-Vault` em caso de dúvida nas convenções.
