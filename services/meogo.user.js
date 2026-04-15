@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MEO Go — Gestor de Catálogo, Downloads & Sync Cloud
 // @namespace    leinad4mind.top/forum
-// @version      1.9.0
+// @version      1.9.1
 // @description  Conta e guarda filmes/séries do MEO Go, sincroniza com Cloudflare Workers (multi-API), gere downloads e copiados, e apresenta uma Dashboard com filtros, posters, notas e exportação. Modifica também os links do header para incluir ?watch_more=1 e adiciona item "Destaques".
 // @author       Leinad4Mind
 // @license      MIT
@@ -96,6 +96,17 @@
  *             - Não guardado: Ícone e fundo Vermelhos ("❌ Marcar Transferido")
  *             - Guardado: Ícone e fundo Verdes ("✅ Retirar Transferido")
  *           • Funcionalidade em grelhas (.filters-content) e tabs (.swiper-tabs)
+ *
+ * v1.9.1 (2026-04-15) — Correções de compatibilidade nos cards
+ *           • Font size dos botões do overlay reduzido (18px → 15px)
+ *             e tamanho reduzido (38px → 34px) para proporção correta
+ *           • Imagens do site deixaram de ser movidas: eliminada a div
+ *             .ft-img-wrapper que movia o <img> e quebrava o lazy-load nativo
+ *           • Overlay inserido diretamente no <a> (linkEl) com position:relative,
+ *             display:block e overflow:hidden para o inset:0 funcionar corretamente
+ *           • CSS de hover simplificado: apenas [data-ft-card]:hover — não depende
+ *             de .relative ou a.mcard que não existem no MEO Go
+ *           • box-shadow de estado aplicado no root (.item-wrapper) em vez do linkEl
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -240,8 +251,6 @@
     globStyle.innerHTML = `
         /* ---- Cloud badges ---- */
         .ft-cloud-badge { opacity:0; transition:opacity 0.18s ease !important; }
-        a.mcard:hover .ft-cloud-badge,
-        .relative:hover .ft-cloud-badge { opacity:1 !important; }
         /* ---- Card hover overlay ---- */
         .ft-card-overlay {
             position:absolute; inset:0; z-index:200;
@@ -250,22 +259,16 @@
             opacity:0; transition:opacity .18s ease; pointer-events:none;
             border-radius:4px;
         }
-        /* Hover nos filtros (.relative wrapper) */
-        .relative:hover .ft-card-overlay,
-        a.mcard:hover .ft-card-overlay,
-        /* Hover nos swipers da homepage (sem .relative) */
+        /* Hover — o data-ft-card está no root (.item-wrapper), overlay está dentro do linkEl (filho direto do root) */
         [data-ft-card]:hover .ft-card-overlay { opacity:1; pointer-events:auto; }
-        /* Cloud badge hover */
-        .relative:hover .ft-cloud-badge,
-        a.mcard:hover .ft-cloud-badge,
         [data-ft-card]:hover .ft-cloud-badge { opacity:1 !important; }
         .ft-card-overlay-btns {
-            display:flex; gap:12px; padding:12px; justify-content:center;
+            display:flex; gap:8px; padding:10px; justify-content:center;
         }
         .ft-ovl-btn {
-            width:38px; height:38px; border-radius:50%; border:none; cursor:pointer;
+            width:34px; height:34px; border-radius:50%; border:none; cursor:pointer;
             display:flex; align-items:center; justify-content:center;
-            font-size:18px; line-height:1; 
+            font-size:15px; line-height:1; 
             transition:background .12s,transform .1s; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
         .ft-ovl-btn:hover { transform:scale(1.04); }
@@ -948,26 +951,26 @@
     }
 
     function applyCardState(root, cache, cloudMap, configs, excludedFromHide, readableApiNames) {
-        // No MEO Go, root é .catalog-movies e link é o <a> interior
-        const linkEl = root.querySelector("a.img-holder") || root;
+        // No MEO Go, root é .item-wrapper e link é o <a> interior
+        const linkEl = root.querySelector("a.img-holder") || root.querySelector("a") || root;
         const href = normUrl(linkEl.href || toAbsUrl(linkEl.getAttribute("href") || ""));
         if (!href || !isRelevantFTItem(href)) return false;
 
         // Marcar com data-ft-card para o CSS de hover funcionar
+        // O atributo fica no root, o overlay fica dentro do linkEl (filho direto)
         root.setAttribute('data-ft-card', '1');
 
-        let imgWrapper = linkEl.querySelector('.ft-img-wrapper');
+        // NÃO mover a img — apenas garantir que linkEl tem position:relative
+        // e display:block + overflow:hidden para o overlay (inset:0) funcionar
         const rawImg = linkEl.querySelector("img");
-        if (rawImg && !imgWrapper) {
-            imgWrapper = document.createElement("div");
-            imgWrapper.className = "ft-img-wrapper";
-            imgWrapper.style.position = "relative";
-            imgWrapper.style.display = "block";
-            rawImg.parentNode.insertBefore(imgWrapper, rawImg);
-            imgWrapper.appendChild(rawImg);
+        const insertTarget = linkEl;
+        if (!insertTarget.style.position || insertTarget.style.position === 'static') {
+            insertTarget.style.position = 'relative';
         }
-        const insertTarget = imgWrapper || root;
-        insertTarget.style.position = insertTarget.style.position || 'relative';
+        if (insertTarget.tagName === 'A') {
+            if (!insertTarget.style.display) insertTarget.style.display = 'block';
+            insertTarget.style.overflow = 'hidden';
+        }
 
         // Estado local
         const isCatalog = cache.setCatalog.has(href);
@@ -991,8 +994,8 @@
         // Container a ocultar: no MEO Go é a própria div .catalog-movies (root)
         const container = root;
 
-        insertTarget.style.boxShadow = "";
-        insertTarget.style.transition = "all 0.2s ease";
+        root.style.boxShadow = "";
+        root.style.transition = "box-shadow 0.2s ease";
 
         if ((meetsHide && hideDownloaded) || (visuallyCatalog && hideHistory)) {
             container.style.display = "none";
@@ -1103,17 +1106,17 @@
         overlay.appendChild(btns);
         insertTarget.appendChild(overlay);
 
-        // Opacidade e borda — usa o card-image wrapper interno
+        // Opacidade e borda — aplica na img ou no linkEl
         const _opWrapper = rawImg || insertTarget;
         if (visuallySaved) {
             _opWrapper.style.opacity = "0.35";
-            if (isCopied && !isDownloaded) insertTarget.style.boxShadow = "0 0 0 3px #ffc107";
-            else if (isSavedInCloud && !isDownloaded) insertTarget.style.boxShadow = `0 0 0 3px ${getApiColor(cloudNames[0], configs)}`;
-            else insertTarget.style.boxShadow = "0 0 0 3px #10b981";
-            insertTarget.style.borderRadius = "6px";
+            if (isCopied && !isDownloaded) root.style.boxShadow = "0 0 0 3px #ffc107";
+            else if (isSavedInCloud && !isDownloaded) root.style.boxShadow = `0 0 0 3px ${getApiColor(cloudNames[0], configs)}`;
+            else root.style.boxShadow = "0 0 0 3px #10b981";
+            root.style.borderRadius = "6px";
         } else {
             _opWrapper.style.opacity = "1";
-            insertTarget.style.boxShadow = "";
+            root.style.boxShadow = "";
         }
 
         return false;
