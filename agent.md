@@ -33,4 +33,4 @@ Exceções validam-se, como os casos em que as plataformas têm diferenças entr
 - Para preparar e dar push à Cloudflare Worker: `npx wrangler deploy`
 - Pode existir a necessidade de efetuar testes locais: `npx wrangler dev`
 
-**Nota Técnica para a IA:** Se te for pedido para construir um novo userscript, baseia-te na estrutura do `filmtwist.user.js` por ser o mais normalizado, e usa sempre os cabeçalhos padrão. Em caso de dúvidas, relê o ficheiro `README.md`.
+**Nota Técnica para a IA:** Se te for pedido para construir um novo userscript, baseia-te na estrutura do `filmin.user.js` por ser o mais normalizado, e usa sempre os cabeçalhos padrão. Em caso de dúvidas, lê o ficheiro `README.md`.

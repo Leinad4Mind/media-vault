@@ -14,6 +14,7 @@ Arquitetura: **1 Cloudflare Worker** (backend partilhado) + **1 userscript por s
 | `services/filmtwist.user.js` | v1.8.2 |
 | `services/pandaplus.user.js` | v1.9.0 |
 | `services/tvcine.user.js` | v1.0.0 |
+| `services/meogo.user.js` | v1.0.0 |
 | `services/zigzag.user.js` | v3.0.0 |
 | `services/simkl-watched.user.js` | v1.0.3 |
 | `worker/worker.js` | v1.1.0 |
@@ -49,6 +50,7 @@ media-sync/
 | FilmTwist.pt | `filmtwist_` | `services/filmtwist.user.js` |
 | Panda+ | `panda_` | `services/pandaplus.user.js` |
 | TVCine | `tvcine_` | `services/tvcine.user.js` |
+| MEO Go | `meogo_` | `services/meogo.user.js` |
 | Kocowa | `kocowa_` | — em breve |
 | Viki | `viki_` | — em breve |
 | Netflix | `netflix_` | — em breve |
